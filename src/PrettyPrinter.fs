@@ -141,6 +141,9 @@ let rec internal formatASTRec (node: AST.Node<'E,'T>): Tree =
     | Assign(target, expr) ->
         mkTree $"Assign" node [("target", formatASTRec target)
                                ("expr", formatASTRec expr)]
+    | While(cond, body) ->
+        mkTree $"While" node [("cond", formatASTRec cond)
+                              ("body", formatASTRec body)]
 
 /// Return a description of an AST node, and possibly some subtrees (that are
 /// added to the overall tree structure).

@@ -317,6 +317,16 @@ let rec internal reduce (env: RuntimeEnv<'E,'T>)
     | Assign(_, _) ->
         None
 
+    | While(cond, body) ->
+        /// Rewritten 'while' loop, transformed into an 'if' on the condition
+        /// 'cond'.  If 'cond' is true, we continue with the whole 'body' of the
+        /// loop, followed by the whole loop itself (i.e. the node we have just
+        /// matched); otherwise, when 'cond' is false, we do nothing (unit).
+        let rewritten = If(cond,
+                           {body with Expr = Seq([body; node])},
+                           {body with Expr = UnitVal})
+        Some(env, {node with Expr = rewritten})
+
 /// Attempt to reduce the given lhs, and then (if the lhs is a value) the rhs,
 /// using the given runtime environment.  Return None if either (a) the lhs
 /// cannot reduce although it is not a value, or (b) the lhs is a value but the

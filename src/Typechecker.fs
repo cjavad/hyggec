@@ -339,6 +339,19 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
         | (Ok(_), Error(es)) -> Error(es)
         | (Error(es1), Error(es2)) -> Error(es1 @ es2)
 
+    | While(cond, body) ->
+        match ((typer env cond), (typer env body)) with
+        | (Ok(tcond), Ok(tbody)) when (isSubtypeOf env tcond.Type TBool) ->
+            Ok { Pos = node.Pos; Env = env; Type = TUnit; Expr = While(tcond, tbody)}
+        | (Ok(tcond), Ok(_)) ->
+            Error([(tcond.Pos, $"'while' condition: expected type %O{TBool}, "
+                               + $"found %O{tcond.Type}")])
+        | Ok(tcond), Error(es) ->
+            Error((tcond.Pos, $"'while' condition: expected type %O{TBool}, "
+                              + $"found %O{tcond.Type}") :: es)
+        | Error(es), Ok(_) -> Error(es)
+        | Error(esCond), Error(esBody) -> Error(esCond @ esBody)
+
 /// Compute the typing of a binary numerical operation, by computing and
 /// combining the typings of the 'lhs' and 'rhs'.  The argument 'descr' (used in
 /// error messages) specifies which expression is being typed, while 'pos'

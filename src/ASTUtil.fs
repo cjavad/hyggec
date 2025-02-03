@@ -90,3 +90,8 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
 
     | Assign(target, expr) ->
         {node with Expr = Assign((subst target var sub), (subst expr var sub))}
+
+    | While(cond, body) ->
+        let substCond = subst cond var sub
+        let substBody = subst body var sub
+        {node with Expr = While(substCond, substBody)}

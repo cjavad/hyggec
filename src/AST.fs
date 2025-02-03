@@ -174,6 +174,10 @@ and Expr<'E,'T> =
     | Assign of target: Node<'E,'T>
               * expr: Node<'E,'T>
 
+    /// 'While' loop: as long as 'cond' is true, repeat the 'body'.
+    | While of cond: Node<'E,'T>
+             * body: Node<'E,'T>
+
 
 /// A type alias for an untyped AST, where there is no typing environment nor
 /// typing information (unit).

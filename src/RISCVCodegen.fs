@@ -482,6 +482,38 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             failwith ($"BUG: assignment to invalid target:%s{Util.nl}"
                       + $"%s{PrettyPrinter.prettyPrint lhs}")
 
+    | While(cond, body) ->
+        /// Label to mark the beginning of the 'while' loop
+        let whileBeginLabel = Util.genSymbol "while_loop_begin"
+        /// Label to mark the beginning of the 'while' loop body
+        let whileBodyBeginLabel = Util.genSymbol "while_body_begin"
+        /// Label to mark the end of the 'while' loop
+        let whileEndLabel = Util.genSymbol "while_loop_end"
+        // Check the 'while' condition, jump to 'whileEndLabel' if it is false.
+        // Here we use a register to load the address of a label (using the
+        // instruction LA) and then jump to it (using the instruction LR): this
+        // way, the label address can be very far from the jump instruction
+        // address --- and this can be important if the compilation of 'body'
+        // produces a large amount of assembly code
+        Asm(RV.LABEL(whileBeginLabel))
+            ++ (doCodegen env cond)
+                .AddText([
+                    (RV.BNEZ(Reg.r(env.Target), whileBodyBeginLabel),
+                     "Jump to loop body if 'while' condition is true")
+                    (RV.LA(Reg.r(env.Target), whileEndLabel),
+                     "Load address of label at the end of the 'while' loop")
+                    (RV.JR(Reg.r(env.Target)), "Jump to the end of the loop")
+                    (RV.LABEL(whileBodyBeginLabel),
+                     "Body of the 'while' loop starts here")
+                ])
+            ++ (doCodegen env body)
+            .AddText([
+                (RV.LA(Reg.r(env.Target), whileBeginLabel),
+                 "Load address of label at the beginning of the 'while' loop")
+                (RV.JR(Reg.r(env.Target)), "Jump to the end of the loop")
+                (RV.LABEL(whileEndLabel), "")
+            ])
+
 /// Generate code to save the given registers on the stack, before a RARS system
 /// call. Register a7 (which holds the system call number) is backed-up by
 /// default, so it does not need to be specified when calling this function.
