@@ -117,6 +117,16 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
     | FieldSelect(target, field) ->
         {node with Expr = FieldSelect((subst target var sub), field)}
 
+    | UnionCons(label, expr) ->
+        {node with Expr = UnionCons(label, (subst expr var sub))}
+
+    | Match(expr, cases) ->
+        /// Mapper function to propagate the substitution along a match case
+        let substCase(lab: string, v: string, cont: Node<'E,'T>) =
+            if (v = var) then (lab, v, cont) // Variable bound, no substitution
+            else (lab, v, (subst cont var sub))
+        let cases2 = List.map substCase cases
+        {node with Expr = Match((subst expr var sub), cases2)}
 
 /// Compute the set of free variables in the given AST node.
 let rec freeVars (node: Node<'E,'T>): Set<string> =
@@ -172,6 +182,16 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
         let (_, nodes) = List.unzip fields
         freeVarsInList nodes
     | FieldSelect(expr, _) -> freeVars expr
+    | UnionCons(_, expr) -> freeVars expr
+    | Match(expr, cases) ->
+        /// Compute the free variables in all match cases continuations, minus
+        /// the variable bound in the corresponding match case.  This 'folder'
+        /// is used to fold over all match cases.
+        let folder (acc: Set<string>) (_, var, cont: Node<'E,'T>): Set<string> =
+            Set.union acc ((freeVars cont).Remove var)
+        /// Free variables in all match continuations
+        let fvConts = List.fold folder Set[] cases
+        Set.union (freeVars expr) fvConts
 
 /// Compute the union of the free variables in a list of AST nodes.
 and internal freeVarsInList (nodes: List<Node<'E,'T>>): Set<string> =
@@ -233,6 +253,16 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         let (_, nodes) = List.unzip fields
         capturedVarsInList nodes
     | FieldSelect(expr, _) -> capturedVars expr
+    | UnionCons(_, expr) -> capturedVars expr
+    | Match(expr, cases) ->
+        /// Compute the captured variables in all match cases continuations,
+        /// minus the variable bound in the corresponding match case.  This
+        /// 'folder' is used to fold over all match cases.
+        let folder (acc: Set<string>) (_, var, cont: Node<'E,'T>): Set<string> =
+            Set.union acc ((capturedVars cont).Remove var)
+        /// Captured variables in all match continuations
+        let cvConts = List.fold folder Set[] cases
+        Set.union (capturedVars expr) cvConts
 
 /// Compute the union of the captured variables in a list of AST nodes.
 and internal capturedVarsInList (nodes: List<Node<'E,'T>>): Set<string> =

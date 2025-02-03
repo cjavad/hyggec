@@ -88,6 +88,9 @@ rule tokenize = parse
 | "do"         { Parser.DO }
 | "fun"        { Parser.FUN }
 | "struct"     { Parser.STRUCT }
+| "union"      { Parser.UNION }
+| "match"      { Parser.MATCH }
+| "with"       { Parser.WITH }
 
 // Generic identifier
 | ident        { Parser.IDENT(LexBuffer<_>.LexemeString lexbuf) }

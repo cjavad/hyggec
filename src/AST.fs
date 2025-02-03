@@ -51,6 +51,8 @@ and Pretype =
             * ret: PretypeNode
     /// A structure pretype, with pretypes for each field.
     | TStruct of fields: List<string * PretypeNode>
+    /// Discriminated union type.  Each case consists of a name and a pretype.
+    | TUnion of cases: List<string * PretypeNode>
 
 
 /// Node of the Abstract Syntax Tree of a Hygge expression.  The meaning of the
@@ -205,6 +207,19 @@ and Expr<'E,'T> =
     /// result; it has no syntax in the parser, so it cannot be written in Hygge
     /// programs.
     | Pointer of addr: uint
+
+    /// Constructor of a discriminated union type instance, with a label and an
+    /// expression.
+    | UnionCons of label: string
+                 * expr: Node<'E,'T>
+
+    /// Pattern matching construct: check whether the given expression matches
+    /// one the specified cases of a discriminated union.  Each case contains
+    /// the case label, a variable that is bound to the matched case value,
+    /// and a continuation expression (that can use that variable to access the
+    /// match case value).
+    | Match of expr: Node<'E,'T>
+             * cases: List<string * string * Node<'E,'T>>
 
 
 /// A type alias for an untyped AST, where there is no typing environment nor
