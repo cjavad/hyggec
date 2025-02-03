@@ -80,3 +80,13 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         // Propagate the substitution in the "let" scope
         {node with Expr = LetT(vname, tpe, (subst init var sub),
                                (subst scope var sub))}
+
+    | LetMut(vname, init, scope) when vname = var ->
+        // Do not substitute the variable in the "let mutable" scope
+        {node with Expr = LetMut(vname, (subst init var sub), scope)}
+    | LetMut(vname, init, scope) ->
+        {node with Expr = LetMut(vname, (subst init var sub),
+                                 (subst scope var sub))}
+
+    | Assign(target, expr) ->
+        {node with Expr = Assign((subst target var sub), (subst expr var sub))}

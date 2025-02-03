@@ -162,6 +162,18 @@ and Expr<'E,'T> =
             * init: Node<'E,'T>
             * scope: Node<'E,'T>
 
+    /// Let-binder for mutable variables, used to introduce a mutable variable
+    /// with the given 'name' in a 'scope'.  The variable is initialised with
+    /// the result of the expression in 'init'.
+    | LetMut of name: string
+              * init: Node<'E,'T>
+              * scope: Node<'E,'T>
+
+    /// Assignment of a value (computed from 'expr') to a mutable target (e.g. a
+    /// variable).
+    | Assign of target: Node<'E,'T>
+              * expr: Node<'E,'T>
+
 
 /// A type alias for an untyped AST, where there is no typing environment nor
 /// typing information (unit).
