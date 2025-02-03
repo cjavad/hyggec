@@ -49,6 +49,7 @@ rule tokenize = parse
 
 // Separators
 | ";"          { Parser.SEMI }
+| ","          { Parser.COMMA }
 
 // Operators
 | "*"          { Parser.TIMES }
@@ -59,6 +60,7 @@ rule tokenize = parse
 | "="          { Parser.EQ }
 | "<"          { Parser.LT }
 | "<-"         { Parser.LARROW }
+| "->"         { Parser.RARROW }
 
 // Parentheses and brackets
 | "("          { Parser.LPAR }
@@ -83,6 +85,7 @@ rule tokenize = parse
 | "mutable"    { Parser.MUTABLE }
 | "while"      { Parser.WHILE }
 | "do"         { Parser.DO }
+| "fun"        { Parser.FUN }
 
 // Generic identifier
 | ident        { Parser.IDENT(LexBuffer<_>.LexemeString lexbuf) }
