@@ -108,7 +108,8 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             | Some(Storage.FPReg(_)) as st ->
                 failwith $"BUG: variable %s{name} of type %O{t} has unexpected storage %O{st}"
             | None -> failwith $"BUG: variable without storage: %s{name}"
-
+    
+    | Sub(lhs, rhs)
     | Add(lhs, rhs)
     | Mult(lhs, rhs) as expr ->
         // Code generation for addition and multiplication is very
@@ -128,6 +129,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             /// Generated code for the numerical operation
             let opAsm =
                 match expr with
+                    | Sub(_,_) ->
+                        Asm(RV.SUB(Reg.r(env.Target),
+                                   Reg.r(env.Target), Reg.r(rtarget)))
                     | Add(_,_) ->
                         Asm(RV.ADD(Reg.r(env.Target),
                                    Reg.r(env.Target), Reg.r(rtarget)))

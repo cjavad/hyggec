@@ -220,7 +220,11 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
             Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = Var(name) }
         | None ->
             Error([(node.Pos, $"undefined variable: %s{name}")])
-
+    | Sub(lhs, rhs) ->
+        match (binaryNumericalOpTyper "subtraction" node.Pos env lhs rhs) with
+        | Ok(tpe, tlhs, trhs) ->
+            Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = Sub(tlhs, trhs) }
+        | Error(es) -> Error(es)
     | Add(lhs, rhs) ->
         match (binaryNumericalOpTyper "addition" node.Pos env lhs rhs) with
         | Ok(tpe, tlhs, trhs) ->

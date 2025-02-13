@@ -93,6 +93,10 @@ and Expr<'E,'T> =
     /// Variable name.
     | Var of name: string
 
+    /// Subtraction between lhs and rhs.
+    | Sub of lhs: Node<'E,'T>
+          * rhs: Node<'E,'T>
+
     /// Addition between lhs and rhs.
     | Add of lhs: Node<'E,'T>
            * rhs: Node<'E,'T>

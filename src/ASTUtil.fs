@@ -24,7 +24,9 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
 
     | Var(vname) when vname = var -> sub // Substitution applied
     | Var(_) -> node // The substitution has no effect
-
+    
+    | Sub(lhs, rhs) ->
+        {node with Expr = Sub((subst lhs var sub), (subst rhs var sub))}
     | Add(lhs, rhs) ->
         {node with Expr = Add((subst lhs var sub), (subst rhs var sub))}
     | Mult(lhs, rhs) ->
