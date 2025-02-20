@@ -773,6 +773,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
     | Pointer(_) ->
         failwith "BUG: pointers cannot be compiled (by design!)"
 
+    | UnionCons(label, expr) -> failwith "todo"
+    | Match(expr, cases) -> failwith "todo"
+
 /// Generate code to save the given registers on the stack, before a RARS system
 /// call. Register a7 (which holds the system call number) is backed-up by
 /// default, so it does not need to be specified when calling this function.

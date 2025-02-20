@@ -47,7 +47,9 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
 
     | Var(vname) when vname = var -> {node with Expr = Var(var2)} // Substitution applied
     | Var(_) -> node // The substitution has no effect
-
+    
+    | Sub(lhs, rhs) ->
+        {node with Expr = Sub((substVar lhs var var2), (substVar rhs var var2))} 
     | Add(lhs, rhs) ->
         {node with Expr = Add((substVar lhs var var2), (substVar rhs var var2))}
     | Mult(lhs, rhs) ->
@@ -186,6 +188,7 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
     | Var(_) ->
         (node, []) // This AST node is already in ANF
 
+    | Sub(lhs, rhs)
     | Add(lhs, rhs)
     | Mult(lhs, rhs)
     | And(lhs, rhs)
@@ -198,6 +201,7 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
         let (rhsANF, rhsDefs) = toANFDefs rhs
         /// This expression in ANF
         let anfExpr = match expr with
+                      | Sub(_,_) -> Sub(lhsANF, rhsANF)
                       | Add(_,_) -> Add(lhsANF, rhsANF)
                       | Mult(_,_) -> Mult(lhsANF, rhsANF)
                       | And(_,_) -> And(lhsANF, rhsANF)

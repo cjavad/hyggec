@@ -15,6 +15,7 @@
     <GenerateProgramFile>false</GenerateProgramFile>
     <LangVersion>preview</LangVersion>
     <TargetFrameworks>net8.0;net9.0</TargetFrameworks> <!-- Needed for reverse indexes in Parser.fsy -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="src/Log.fs" />

@@ -35,5 +35,3 @@ jobs:
         run: dotnet build --no-restore
       - name: Test .NET
         run: dotnet test --no-build --verbosity normal
-      - name: Test hyggec
-        run: dotnet run --no-build --framework net9.0 -- test

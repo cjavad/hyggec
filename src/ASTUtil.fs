@@ -144,6 +144,7 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
     | Add(lhs, rhs)
     | Mult(lhs, rhs) ->
         Set.union (freeVars lhs) (freeVars rhs)
+    | Sub(lhs, rhs)
     | And(lhs, rhs)
     | Or(lhs, rhs) ->
         Set.union (freeVars lhs) (freeVars rhs)
@@ -218,8 +219,9 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         // All free variables of a value are considered as captured
         freeVars node
     | Var(_) -> Set[]
+    | Sub(lhs, rhs)
     | Add(lhs, rhs)
-    | Mult(lhs, rhs) ->
+        | Mult(lhs, rhs) ->
         Set.union (capturedVars lhs) (capturedVars rhs)
     | And(lhs, rhs)
     | Or(lhs, rhs) ->
