@@ -115,6 +115,9 @@ and Expr<'E,'T> =
 
     /// Logical not
     | Not of arg: Node<'E,'T>
+    
+    /// Numerical negation of the argument.
+    | Neg of arg: Node<'E,'T>
 
     /// Comparison: is the lhs equal to the rhs?
     | Eq of lhs: Node<'E,'T>

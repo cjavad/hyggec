@@ -1,4 +1,4 @@
 #!/bin/sh
-ARGS="-v q --framework net9.0"
+ARGS="-v q --framework net9.0 -c Debug"
 dotnet build $ARGS 2>&1 > /dev/null
 dotnet run --no-build $ARGS -- "$@"

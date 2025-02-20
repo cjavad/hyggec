@@ -257,6 +257,14 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
             Error([(node.Pos, $"logical 'not': expected argument of type %O{TBool}, "
                               + $"found %O{targ.Type}")])
         | Error(es) -> Error(es)
+        
+    | Neg(arg) ->
+        match (typer env arg) with
+        | Ok(targ) when (isSubtypeOf env targ.Type TInt) ->
+            Ok { Pos = node.Pos; Env = env; Type = TInt; Expr = Neg(targ) }
+        | Ok(targ) ->
+            Error([(node.Pos, $"numerical 'neg': expected argument of type %O{TInt}, " + $"found %O{targ.Type}")])
+        | Error(es) -> Error(es)
 
     | Eq(lhs, rhs) ->
         match (numericalRelationTyper "equal to" node.Pos env lhs rhs) with

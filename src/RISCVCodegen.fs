@@ -189,7 +189,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         /// to increase its target register)
         let asm = doCodegen env arg
         asm.AddText(RV.SEQZ(Reg.r(env.Target), Reg.r(env.Target)))
-
+    | Neg(arg) ->
+        let asm = doCodegen env arg
+        asm.AddText(RV.NEG(Reg.r(env.Target), Reg.r(env.Target)))
     | Eq(lhs, rhs)
     | Less(lhs, rhs) as expr ->
         // Code generation for equality and less-than relations is very similar:

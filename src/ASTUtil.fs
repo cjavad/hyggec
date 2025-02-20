@@ -38,7 +38,8 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = Or((subst lhs var sub), (subst rhs var sub))}
     | Not(arg) ->
         {node with Expr = Not(subst arg var sub)}
-
+    | Neg(arg) ->
+        {node with Expr = Neg(subst arg var sub)}
     | Eq(lhs, rhs) ->
         {node with Expr = Eq((subst lhs var sub), (subst rhs var sub))}
     | Less(lhs, rhs) ->
@@ -147,6 +148,7 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
     | Or(lhs, rhs) ->
         Set.union (freeVars lhs) (freeVars rhs)
     | Not(arg) -> freeVars arg
+    | Neg(arg) -> freeVars arg
     | Eq(lhs, rhs)
     | Less(lhs, rhs) ->
         Set.union (freeVars lhs) (freeVars rhs)
@@ -223,6 +225,7 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
     | Or(lhs, rhs) ->
         Set.union (capturedVars lhs) (capturedVars rhs)
     | Not(arg) -> capturedVars arg
+    | Neg(arg) -> capturedVars arg
     | Eq(lhs, rhs)
     | Less(lhs, rhs) ->
         Set.union (capturedVars lhs) (capturedVars rhs)
