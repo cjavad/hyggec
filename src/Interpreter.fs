@@ -6,6 +6,7 @@
 /// Interpreter for Hygge programs.
 module Interpreter
 
+open System
 open AST
 
 
@@ -118,6 +119,16 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
         | (_, _) ->
             match (reduceLhsRhs env lhs rhs) with
             | Some(env', lhs', rhs') -> Some(env', { node with Expr = Mult(lhs', rhs') })
+            | None -> None
+    | Div(lhs, rhs) ->
+        match (lhs.Expr, rhs.Expr) with
+        | (IntVal(v1), IntVal(v2)) -> if v2 <> 0 then Some(env, { node with Expr = IntVal(v1 / v2) })
+                                      else failwith $"Division by zero error"
+        | (FloatVal(v1), FloatVal(v2)) -> if v2 <> 0.0f then Some(env, { node with Expr = FloatVal(v1 / v2) })
+                                          else failwith $"Division by zero error"
+        | (_,_) ->
+            match (reduceLhsRhs env lhs rhs) with
+            | Some(env', lhs', rhs') -> Some(env', { node with Expr = Div(lhs', rhs') })
             | None -> None
 
     | Add(lhs, rhs) ->
