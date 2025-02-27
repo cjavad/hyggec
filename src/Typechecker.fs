@@ -9,7 +9,7 @@ module Typechecker
 
 open AST
 open Type
-
+open Syscalls
 
 /// Representation of typing errors
 type TypeErrors = list<Position * string>
@@ -290,7 +290,11 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
     | Div(lhs, rhs) ->
         match (binaryNumericalOpTyper "division" node.Pos env lhs rhs) with
         | Ok(tpe, tlhs, trhs) ->
-            Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = Div(tlhs, trhs) }
+            Ok
+                { Pos = node.Pos
+                  Env = env
+                  Type = tpe
+                  Expr = Div(tlhs, trhs) }
         | Error(es) -> Error(es)
 
     | And(lhs, rhs) ->
@@ -908,10 +912,40 @@ and internal printArgTyper descr pos (env: TypingEnv) (arg: UntypedAST) : Result
         )
     | Error(es) -> Error(es)
 
-and internal syscallTyper pos (env: TypingEnv) (number: int) (args: List<UntypedAST>) : Result<Type * List<TypedAST>, TypeErrors> =
-    match args with
-    | [] -> Error([ (pos, "syscall: expected at least one argument") ])
-    | _ -> Ok(TUnit, [])
+and internal syscallTyper
+    pos
+    (env: TypingEnv)
+    (number: int)
+    (args: List<UntypedAST>)
+    : Result<Type * List<TypedAST>, TypeErrors> =
+
+    match (findSyscall Platform.RARS number) with
+    | Some(Definition(_, _, targs, tret)) ->
+        // Check incoming args
+        let argTypings = List.map (fun n -> typer env n) args
+        let argErrors = collectErrors argTypings
+
+        match argErrors with
+        | [] ->
+            let typedArgs = List.map getOkValue argTypings
+            let argTypes = List.map (fun (t: TypedAST) -> t.Type) typedArgs
+            
+           
+            if targs.Length <> argTypes.Length then
+                Error(
+                    [ (pos,
+                       $"%s{syscallFormatName Platform.RARS number}: expected %d{targs.Length} arguments, found %d{argTypes.Length}") ]
+                )            
+            elif List.forall2 (fun t1 t2 -> isSubtypeOf env t1 t2) argTypes targs then
+                Ok(tret, typedArgs)
+            else
+                Error(
+                    [ (pos,
+                       $"%s{syscallFormatName Platform.RARS number} %d{number}: expected arguments of types %s{Util.formatSeq targs}, found %s{Util.formatSeq argTypes}") ]
+                )
+        | _ -> Error(argErrors)
+
+    | None -> Error([ (pos, $"unknown syscall number: %d{number}") ])
 
 /// Perform the typing of a 'let...' binding (without type annotations).  The
 /// arguments are: the 'pos'ition of the "let..." expression, the typing

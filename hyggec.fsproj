@@ -35,6 +35,7 @@
     <Compile Include="src/Util.fs" />
     <Compile Include="src/ANF.fs" />
     <Compile Include="src/Type.fs" />
+    <Compile Include="src/Syscalls.fs" />
     <Compile Include="src/Typechecker.fs" />
     <Compile Include="src/PrettyPrinter.fs" />
     <Compile Include="src/Interpreter.fs" />
