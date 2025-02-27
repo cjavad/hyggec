@@ -244,7 +244,7 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
     | BNot(arg) ->
         match (typer env arg) with
         | Ok(targ) when (isSubtypeOf env targ.Type TInt) ->
-            Ok { Pos = node.Pos; Env = env; Type = targ.Type; Expr = Neg(targ) }
+            Ok { Pos = node.Pos; Env = env; Type = targ.Type; Expr = BNot(targ) }
         | Ok(targ) ->
             Error([(node.Pos, $"binary 'not': expected argument of type %O{TInt}, " + $"found %O{targ.Type}")])
         | Error(es) -> Error(es)

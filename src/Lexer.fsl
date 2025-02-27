@@ -72,9 +72,9 @@ rule tokenize = parse
 | "<-"         { Parser.LARROW }
 | "->"         { Parser.RARROW }
 | "~"          { Parser.BNOT }
-| "|"          { Parset.BOR }
+| "|"          { Parser.BOR }
 | "&"          { Parser.BAND }
-| "^"          { Parser.XOR }
+| "^"          { Parser.BXOR }
 | "<<"         { Parser.BSL }
 | ">>"         { Parser.BSR }
 

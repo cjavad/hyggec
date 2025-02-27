@@ -264,6 +264,11 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         // All free variables of a value are considered as captured
         freeVars node
     | Var(_) -> Set[]
+    | BAnd(lhs, rhs)
+    | BOr(lhs, rhs)
+    | BXor(lhs, rhs)
+    | BSL(lhs, rhs)
+    | BSR(lhs, rhs)
     | Sub(lhs, rhs)
     | Add(lhs, rhs)
     | Mult(lhs, rhs) ->
@@ -277,6 +282,7 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
     | SCOr(lhs, rhs)
     | Or(lhs, rhs) ->
         Set.union (capturedVars lhs) (capturedVars rhs)
+    | BNot(arg)
     | Not(arg) -> capturedVars arg
     | Neg(arg) -> capturedVars arg
     | Eq(lhs, rhs)

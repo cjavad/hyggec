@@ -155,7 +155,7 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
     | BNot(arg) ->
         match arg.Expr with
         | IntVal(v) -> Some(env, { node with Expr = IntVal(~~~v) })
-        | (_, _) ->
+        | _ ->
             match (reduce env arg) with
             | Some(env', arg2) -> Some(env', { node with Expr = BNot(arg2) })
             | None -> None
