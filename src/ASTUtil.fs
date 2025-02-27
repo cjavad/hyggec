@@ -52,7 +52,8 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = Print(subst arg var sub)}
     | PrintLn(arg) ->
         {node with Expr = PrintLn(subst arg var sub)}
-
+    | Syscall(num, args) ->
+        {node with Expr = Syscall(num, List.map (fun n -> (subst n var sub)) args)}
     | If(cond, ifTrue, ifFalse) ->
         {node with Expr = If((subst cond var sub), (subst ifTrue var sub),
                                                    (subst ifFalse var sub))}
@@ -173,6 +174,7 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
         Set.union (freeVars target) (freeVars expr)
     | While(cond, body) -> Set.union (freeVars cond) (freeVars body)
     | Assertion(arg) -> freeVars arg
+    | Syscall(_, args) -> freeVarsInList args
     | Type(_, _, scope) -> freeVars scope
     | Lambda(args, body) ->
         let (argNames, _) = List.unzip args
@@ -251,6 +253,7 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         Set.union (capturedVars target) (capturedVars expr)
     | While(cond, body) -> Set.union (capturedVars cond) (capturedVars body)
     | Assertion(arg) -> capturedVars arg
+    | Syscall(_, args) -> capturedVarsInList args
     | Type(_, _, scope) -> capturedVars scope
     | Application(expr, args) ->
         let fvArgs = List.map capturedVars args

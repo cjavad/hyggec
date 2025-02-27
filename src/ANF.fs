@@ -75,11 +75,13 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         {node with Expr = Print(substVar arg var var2)}
     | PrintLn(arg) ->
         {node with Expr = PrintLn(substVar arg var var2)}
-
+    | Syscall(num, args) ->
+        let substArgs = List.map (fun n -> (substVar n var var2)) args
+        {node with Expr = Syscall(num, substArgs)}
     | If(cond, ifTrue, ifFalse) ->
         {node with Expr = If((substVar cond var var2), (substVar ifTrue var var2),
                                                        (substVar ifFalse var var2))}
-
+   
     | Seq(nodes) ->
         let substNodes = List.map (fun n -> (substVar n var var2)) nodes
         {node with Expr = Seq(substNodes)}
@@ -239,7 +241,14 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
         let anfDef = ANFDef(false, {node with Expr = anfExpr})
 
         ({node with Expr = Var(anfDef.Var)}, anfDef :: argDefs)
+    | Syscall(num, args) ->
+        /// Arguments in ANF and related definitions
+        let (argsANF, argsDefs) = List.unzip (List.map toANFDefs args)
+        /// Definition binding this expression in ANF to its variable
+        let anfDef = ANFDef(false, {node with Expr = Syscall(num, argsANF)})
 
+        ({node with Expr = Var(anfDef.Var)},
+         anfDef :: List.concat (List.rev argsDefs))
     | Seq(nodes) ->
         match (List.rev nodes) with
         | [] ->
@@ -360,7 +369,7 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
         let uniqArgs = List.zip uniqArgNames argTypes
 
         ({node with Expr = Lambda(uniqArgs, bodyANF)}, [])
-
+    
     | Application(appExpr, args) ->
         /// Applied expression in ANF and related definitions
         let (appExprANF, appExprDefs) = toANFDefs appExpr

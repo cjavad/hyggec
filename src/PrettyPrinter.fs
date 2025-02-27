@@ -135,6 +135,11 @@ let rec internal formatASTRec (node: AST.Node<'E,'T>): Tree =
         mkTree "Print" node [("arg", formatASTRec arg)]
     | PrintLn(arg) ->
         mkTree "PrintLn" node [("arg", formatASTRec arg)]
+    | Syscall(num, args) ->
+        let argChildren =
+            List.map (fun (i, n) -> ($"arg %d{i+1}", formatASTRec n))
+                     (List.indexed args)
+        mkTree $"Syscall %d{num}" node argChildren
     | If(condition, ifTrue, ifFalse) ->
         mkTree "Conditional" node [("condition", formatASTRec condition);
                                    ("ifTrue", formatASTRec ifTrue)

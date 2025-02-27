@@ -83,6 +83,7 @@ rule tokenize = parse
 | "print"      { Parser.PRINT }
 | "println"    { Parser.PRINTLN }
 | "assert"     { Parser.ASSERT }
+| "syscall"    { Parser.SYSCALL }
 | "type"       { Parser.TYPE }
 | "mutable"    { Parser.MUTABLE }
 | "while"      { Parser.WHILE }

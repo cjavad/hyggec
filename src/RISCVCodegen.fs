@@ -354,7 +354,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                 (RV.ECALL, "")
             ])
             ++ (afterSysCall [Reg.a0] [])
-
+    | Syscall(a, b) ->
+        // Oh baby so many syscalls.
+        failwith "not implemented"
     | If(condition, ifTrue, ifFalse) ->
         /// Label to jump to when the 'if' condition is true
         let labelTrue = Util.genSymbol "if_true"
