@@ -54,7 +54,7 @@ let mkNode (parseState: IParseState, inputIdx: int, e: UntypedExpr): UntypedAST 
 %token AND OR NOT
 
 // Tokens for relational operators
-%token EQ LT
+%token EQ LT GT LEQ GEQ
 
 // Tokens for control flow
 %token IF THEN ELSE
@@ -171,6 +171,9 @@ andExpr:
 relExpr:
   | addSubExpr EQ addSubExpr { mkNode(parseState, 2, Expr.Eq($1, $3)) }
   | addSubExpr LT addSubExpr { mkNode(parseState, 2, Expr.Less($1, $3)) }
+  | addSubExpr GT addSubExpr { mkNode(parseState, 2, Expr.Greater($1, $3)) }
+  | addSubExpr LEQ addSubExpr { mkNode(parseState, 2, Expr.LessEq($1, $3)) }
+  | addSubExpr GEQ addSubExpr { mkNode(parseState, 2, Expr.GreaterEq($1, $3)) }
   | addSubExpr               { $1 }
 
 

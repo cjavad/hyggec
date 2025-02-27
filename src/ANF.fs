@@ -67,6 +67,12 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         {node with Expr = Eq((substVar lhs var var2), (substVar rhs var var2))}
     | Less(lhs, rhs) ->
         {node with Expr = Less((substVar lhs var var2), (substVar rhs var var2))}
+    | LessEq(lhs, rhs) ->
+        {node with Expr = Less((substVar lhs var var2), (substVar rhs var var2))}
+    | Greater(lhs, rhs) ->
+        {node with Expr = Less((substVar lhs var var2), (substVar rhs var var2))}
+    | GreaterEq(lhs, rhs) ->
+        {node with Expr = Less((substVar lhs var var2), (substVar rhs var var2))}
 
     | ReadInt
     | ReadFloat -> node // The substitution has no effect
@@ -194,6 +200,9 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
     | And(lhs, rhs)
     | Or(lhs, rhs)
     | Eq(lhs, rhs)
+    | Greater(lhs, rhs)
+    | LessEq(lhs, rhs)
+    | GreaterEq(lhs, rhs)
     | Less(lhs, rhs) as expr ->
         /// Left-hand-side argument in ANF and related definitions
         let (lhsANF, lhsDefs) = toANFDefs lhs
@@ -207,6 +216,9 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
                       | And(_,_) -> And(lhsANF, rhsANF)
                       | Or(_,_) -> Or(lhsANF, rhsANF)
                       | Eq(_,_) -> Eq(lhsANF, rhsANF)
+                      | Greater(_,_) -> Greater(lhsANF, rhsANF)
+                      | LessEq(_,_) -> LessEq(lhsANF, rhsANF)
+                      | GreaterEq(_,_) -> GreaterEq(lhsANF, rhsANF)
                       | Less(_,_) -> Less(lhsANF, rhsANF)
                       | e -> failwith $"BUG: unexpected expression: %O{e}"
         /// Definition binding this expression in ANF to its variable

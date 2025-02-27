@@ -44,6 +44,12 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = Eq((subst lhs var sub), (subst rhs var sub))}
     | Less(lhs, rhs) ->
         {node with Expr = Less((subst lhs var sub), (subst rhs var sub))}
+    | LessEq(lhs, rhs) ->
+        {node with Expr = LessEq((subst lhs var sub), (subst rhs var sub))}
+    | Greater(lhs, rhs) ->
+        {node with Expr = Greater((subst lhs var sub), (subst rhs var sub))}
+    | GreaterEq(lhs, rhs) ->
+        {node with Expr = GreaterEq((subst lhs var sub), (subst rhs var sub))}
 
     | ReadInt
     | ReadFloat -> node // The substitution has no effect
@@ -153,6 +159,12 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
     | Eq(lhs, rhs)
     | Less(lhs, rhs) ->
         Set.union (freeVars lhs) (freeVars rhs)
+    | LessEq(lhs, rhs) ->
+        Set.union (freeVars lhs) (freeVars rhs)
+    | Greater(lhs, rhs) ->
+        Set.union (freeVars lhs) (freeVars rhs)
+    | GreaterEq(lhs, rhs) ->
+        Set.union (freeVars lhs) (freeVars rhs)
     | ReadInt
     | ReadFloat -> Set[]
     | Print(arg)
@@ -230,6 +242,12 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
     | Neg(arg) -> capturedVars arg
     | Eq(lhs, rhs)
     | Less(lhs, rhs) ->
+        Set.union (capturedVars lhs) (capturedVars rhs)
+    | LessEq(lhs, rhs) ->
+        Set.union (capturedVars lhs) (capturedVars rhs)
+    | Greater(lhs, rhs) ->
+        Set.union (capturedVars lhs) (capturedVars rhs)
+    | GreaterEq(lhs, rhs) ->
         Set.union (capturedVars lhs) (capturedVars rhs)
     | ReadInt
     | ReadFloat -> Set[]
