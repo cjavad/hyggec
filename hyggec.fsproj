@@ -14,7 +14,7 @@
     <!-- Build settings -->
     <GenerateProgramFile>false</GenerateProgramFile>
     <LangVersion>preview</LangVersion>
-    <TargetFrameworks>net8.0;net9.0</TargetFrameworks> <!-- Needed for reverse indexes in Parser.fsy -->
+    <TargetFramework>net8.0</TargetFramework> <!-- Needed for reverse indexes in Parser.fsy -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup>

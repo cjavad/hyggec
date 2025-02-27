@@ -54,7 +54,10 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         Asm(RV.LI(Reg.r(env.Target), value), $"Bool value '%O{v}'")
 
     | IntVal(v) ->
-        Asm(RV.LI(Reg.r(env.Target), v))
+        if (v &&& ~~~0xfff = v) then
+            Asm(RV.LUI(Reg.r(env.Target), Imm20(v >>> 12)))
+        else
+            Asm(RV.LI(Reg.r(env.Target), v))
 
     | FloatVal(v) ->
         // We convert the float value into its bytes, and load it as immediate
@@ -111,6 +114,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
     
     | Sub(lhs, rhs)
     | Add(lhs, rhs)
+    | Div(lhs, rhs)
     | Mult(lhs, rhs) as expr ->
         // Code generation for addition and multiplication is very
         // similar: we compile the lhs and rhs giving them different target
@@ -138,6 +142,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                     | Mult(_,_) ->
                         Asm(RV.MUL(Reg.r(env.Target),
                                    Reg.r(env.Target), Reg.r(rtarget)))
+                    | Div(_,_) ->
+                        Asm(RV.DIV(Reg.r(env.Target),
+                                   Reg.r(env.Target), Reg.r(rtarget)))
                     | x -> failwith $"BUG: unexpected operation %O{x}"
             // Put everything together
             lAsm ++ rAsm ++ opAsm
@@ -158,6 +165,10 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                 | Mult(_,_) ->
                     Asm(RV.FMUL_S(FPReg.r(env.FPTarget),
                                   FPReg.r(env.FPTarget), FPReg.r(rfptarget)))
+                | Div(_,_) ->
+                    Asm(RV.FDIV_S(FPReg.r(env.FPTarget),
+                                  FPReg.r(env.FPTarget), FPReg.r(rfptarget)))
+                       
                 | x -> failwith $"BUG: unexpected operation %O{x}"
             // Put everything together
             lAsm ++ rAsm ++ opAsm

@@ -1,6 +1,6 @@
 #!/bin/sh
 DOTNET_VERSION=$(dotnet --version)
 FRAMEWORK_VERSION="net$(echo $DOTNET_VERSION | cut -d' ' -f2 | cut -d'.' -f1-2)"
-ARGS="-v q --framework $FRAMEWORK_VERSION -c Debug"
+ARGS="-v q -c Debug"
 dotnet build $ARGS 2>&1 > /dev/null
 dotnet run --no-build $ARGS -- "$@"
