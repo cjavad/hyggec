@@ -115,6 +115,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
     | Sub(lhs, rhs)
     | Add(lhs, rhs)
     | Div(lhs, rhs)
+    | Rem(lhs, rhs)
     | Mult(lhs, rhs) as expr ->
         // Code generation for addition and multiplication is very
         // similar: we compile the lhs and rhs giving them different target
@@ -144,6 +145,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                                    Reg.r(env.Target), Reg.r(rtarget)))
                     | Div(_,_) ->
                         Asm(RV.DIV(Reg.r(env.Target),
+                                   Reg.r(env.Target), Reg.r(rtarget)))
+                    | Rem(_,_) ->
+                        Asm(RV.REM(Reg.r(env.Target),
                                    Reg.r(env.Target), Reg.r(rtarget)))
                     | x -> failwith $"BUG: unexpected operation %O{x}"
             // Put everything together
