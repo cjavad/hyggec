@@ -131,6 +131,7 @@ let tests = testList "tests" [
                 let last = Interpreter.reduceFully ast (Some (fun _ -> "")) (Some ignore)
                 Expect.isTrue (Interpreter.isStuck last)
                               "Interpreter should have reached a stuck expression"
+        
     createTestList "codegen"
         <| fun file ->
             testCodegen file 0
