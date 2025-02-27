@@ -68,6 +68,18 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         {node with Expr = Or((substVar lhs var var2), (substVar rhs var var2))}
     | Xor(lhs, rhs) ->
         {node with Expr = Xor((substVar lhs var var2), (substVar rhs var var2))}
+    | BNot(arg) ->
+        {node with Expr = BNot(substVar arg var var2)}
+    | BAnd(lhs, rhs) ->
+        {node with Expr = BAnd((substVar lhs var var2), (substVar rhs var var2))}
+    | BOr(lhs, rhs) ->
+        {node with Expr = BOr((substVar lhs var var2), (substVar rhs var var2))}
+    | BXor(lhs, rhs) ->
+        {node with Expr = BXor((substVar lhs var var2), (substVar rhs var var2))}
+    | BSL(lhs, rhs) ->
+        {node with Expr = BSL((substVar lhs var var2), (substVar rhs var var2))}
+    | BSR(lhs, rhs) ->
+        {node with Expr = BSR((substVar lhs var var2), (substVar rhs var var2))}
     | Not(arg) ->
         {node with Expr = Not(substVar arg var var2)}
     | Neg(arg) ->
@@ -203,6 +215,11 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
     | Var(_) ->
         (node, []) // This AST node is already in ANF
 
+    | BAnd(lhs, rhs)
+    | BOr(lhs, rhs)
+    | BXor(lhs, rhs)
+    | BSL(lhs, rhs)
+    | BSR(lhs, rhs)
     | Sub(lhs, rhs)
     | Add(lhs, rhs)
     | Mult(lhs, rhs)
@@ -224,6 +241,11 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
         let (rhsANF, rhsDefs) = toANFDefs rhs
         /// This expression in ANF
         let anfExpr = match expr with
+                      | BAnd(_,_) -> BAnd(lhsANF, rhsANF)
+                      | BOr(_,_) -> BOr(lhsANF, rhsANF)
+                      | BXor(_,_) -> BXor(lhsANF, rhsANF)
+                      | BSL(_,_) -> BSL(lhsANF, rhsANF)
+                      | BSR(_,_) -> BSR(lhsANF, rhsANF)
                       | Sub(_,_) -> Sub(lhsANF, rhsANF)
                       | Add(_,_) -> Add(lhsANF, rhsANF)
                       | Mult(_,_) -> Mult(lhsANF, rhsANF)
@@ -246,6 +268,7 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
         let anfDef = ANFDef(false, {node with Expr = expr})
         ({node with Expr = Var(anfDef.Var)}, [anfDef])
 
+    | BNot(arg)
     | Not(arg)
     | Neg(arg)
     | Print(arg)
@@ -255,6 +278,7 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
         let (argANF, argDefs) = toANFDefs arg
         /// This expression in ANF
         let anfExpr = match expr with
+                      | BNot(_) -> BNot(argANF)
                       | Not(_) -> Not(argANF)
                       | Neg(_) -> Neg(argANF)
                       | Print(_) -> Print(argANF)
