@@ -122,8 +122,7 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             | None -> None
     | Div(lhs, rhs) ->
         match (lhs.Expr, rhs.Expr) with
-        | (IntVal(v1), IntVal(v2)) -> if v2 <> 0 then Some(env, { node with Expr = IntVal(v1 / v2) })
-                                      else failwith $"Division by zero error"
+        | (IntVal(v1), IntVal(v2)) -> Some(env, { node with Expr = IntVal(v1 / v2) })
         | (FloatVal(v1), FloatVal(v2)) -> Some(env, { node with Expr = FloatVal(v1 / v2) })
         | (_,_) ->
             match (reduceLhsRhs env lhs rhs) with
