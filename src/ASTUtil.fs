@@ -33,7 +33,18 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = Div((subst lhs var sub), (subst rhs var sub))}
     | Mult(lhs, rhs) ->
         {node with Expr = Mult((subst lhs var sub), (subst rhs var sub))}
-    
+    | BNot(arg) -> 
+        {node with Expr = BNot((subst arg var sub))}
+    | BAnd(lhs, rhs) ->
+        {node with Expr = BAnd((subst lhs var sub), (subst rhs var sub))}
+    | BOr(lhs, rhs) ->
+        {node with Expr = BOr((subst lhs var sub), (subst rhs var sub))}
+    | BXor(lhs, rhs) ->
+        {node with Expr = BXor((subst lhs var sub), (subst rhs var sub))}
+    | BSL(lhs, rhs) ->
+        {node with Expr = BSL((subst lhs var sub), (subst rhs var sub))}
+    | BSR(lhs, rhs) ->
+        {node with Expr = BSR((subst lhs var sub), (subst rhs var sub))}
     | And(lhs, rhs) ->
         {node with Expr = And((subst lhs var sub), (subst rhs var sub))}
     | Or(lhs, rhs) ->
@@ -148,10 +159,16 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
         Set.union (freeVars lhs) (freeVars rhs)
     | Div(lhs, rhs) ->
         Set.union (freeVars lhs) (freeVars rhs)
+    | BAnd(lhs, rhs)
+    | BOr(lhs, rhs)
+    | BXor(lhs, rhs)
+    | BSL(lhs, rhs)
+    | BSR(lhs, rhs)
     | Sub(lhs, rhs)
     | And(lhs, rhs)
     | Or(lhs, rhs) ->
         Set.union (freeVars lhs) (freeVars rhs)
+    | BNot(arg)
     | Not(arg) -> freeVars arg
     | Neg(arg) -> freeVars arg
     | Eq(lhs, rhs)
