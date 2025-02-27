@@ -53,6 +53,9 @@ let mkNode (parseState: IParseState, inputIdx: int, e: UntypedExpr): UntypedAST 
 // Tokens for logical operators
 %token AND SCAND OR SCOR XOR NOT
 
+// Tokens for bitwise operators
+%token BAND BOR BXOR BSL BSR BNOT
+
 // Tokens for relational operators
 %token EQ LT GT LEQ GEQ
 
@@ -184,18 +187,28 @@ andExpr:
 
 // Relational expression
 relExpr:
-  | addSubExpr EQ addSubExpr { mkNode(parseState, 2, Expr.Eq($1, $3)) }
-  | addSubExpr LT addSubExpr { mkNode(parseState, 2, Expr.Less($1, $3)) }
-  | addSubExpr GT addSubExpr { mkNode(parseState, 2, Expr.Greater($1, $3)) }
-  | addSubExpr LEQ addSubExpr { mkNode(parseState, 2, Expr.LessEq($1, $3)) }
-  | addSubExpr GEQ addSubExpr { mkNode(parseState, 2, Expr.GreaterEq($1, $3)) }
-  | addSubExpr               { $1 }
+  | shiftExpr EQ shiftExpr { mkNode(parseState, 2, Expr.Eq($1, $3)) }
+  | shiftExpr LT shiftExpr { mkNode(parseState, 2, Expr.Less($1, $3)) }
+  | shiftExpr               { $1 }
 
+shiftExpr:
+  | shiftExpr BSL bitwiseExpr { mkNode(parseState, 2, Expr.BSL($1, $3)) }
+  | shiftExpr BSR bitwiseExpr { mkNode(parseState, 2, Expr.BSR($1, $3)) }
+  | bitwiseExpr               { $1 }
+
+bitwiseExpr:
+  | bitwiseExpr BAND addSubExpr { mkNode(parseState, 2, Expr.BAnd($1, $3)) }
+  | bitwiseExpr BOR addSubExpr  { mkNode(parseState, 2, Expr.BOr($1, $3)) }
+  | bitwiseExpr BXOR addSubExpr { mkNode(parseState, 2, Expr.BXor($1, $3)) }
+  | addSubExpr                  { $1 }
 
 // Additive expression
 addSubExpr:
   | addSubExpr PLUS  multExpr { mkNode(parseState, 2, Expr.Add($1, $3)) }
   | addSubExpr MINUS multExpr { mkNode(parseState, 2, Expr.Sub($1, $3)) }
+  | addSubExpr GT addSubExpr { mkNode(parseState, 2, Expr.Greater($1, $3)) }
+  | addSubExpr LEQ addSubExpr { mkNode(parseState, 2, Expr.LessEq($1, $3)) }
+  | addSubExpr GEQ addSubExpr { mkNode(parseState, 2, Expr.GreaterEq($1, $3)) }
   | multExpr                  { $1 }
 
 // Multiplicative expression
@@ -207,6 +220,7 @@ multExpr:
 
 // Unary expression
 unaryExpr:
+  | BNOT unaryExpr                { mkNode(parseState, 1, Expr.BNot($2)) }
   | NOT unaryExpr                 { mkNode(parseState, 1, Expr.Not($2)) }
   | MINUS unaryExpr               { mkNode(parseState, 1, Expr.Neg($2)) }
   | READ_INT LIT_UNIT             { mkNode(parseState, 1, Expr.ReadInt) }
