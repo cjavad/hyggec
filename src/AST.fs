@@ -109,6 +109,29 @@ and Expr<'E,'T> =
     | Div of lhs: Node<'E, 'T>
            * rhs: Node<'E, 'T>
 
+    // Bitwise not of arg
+    | BNot of arg: Node<'E, 'T>
+      
+    // Bitwise and of lhs and rhs
+    | BAnd of lhs: Node<'E, 'T>
+            * rhs: Node<'E, 'T>
+
+    // Bitwise or of lhs and rhs
+    | BOr of lhs: Node<'E, 'T>
+           * rhs: Node<'E, 'T>
+
+    // Bitwise xor of lhs and rhs
+    | BXor of lhs: Node<'E, 'T>
+            * rhs: Node<'E, 'T>
+
+    // Logical shift left of lhs by rhs
+    | BSL of lhs: Node<'E, 'T>
+           * rhs: Node<'E, 'T>
+
+    // Logical shift right of lhs by rhs
+    | BSR of lhs: Node<'E, 'T>
+           * rhs: Node<'E, 'T>
+
     /// Logical and between lhs and rhs.
     | And of lhs: Node<'E,'T>
            * rhs: Node<'E,'T>
