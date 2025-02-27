@@ -321,7 +321,7 @@ let internal syncANFCodegenEnvs (fromEnv: ANFCodegenEnv)
 /// Code generation function: compile the expression in the given AST node,
 /// which is expected to be in ANF.
 let rec internal doCodegen (env: ANFCodegenEnv)
-                           (node: TypedAST): ANFCodegenResult =
+                           (node: TypedAST): ANFCodegenResult = 
     match node.Expr with
     | Var(vname) when (expandType node.Env node.Type) <> TFloat ->
         /// Target register to store the vname's value, and code to load it
@@ -402,7 +402,7 @@ and internal doLetInitCodegen (env: ANFCodegenEnv) (init: TypedAST): ANFCodegenR
         let (targetReg, targetLoadRes) = loadIntVar env env.TargetVar []
         { Asm = targetLoadRes.Asm ++ Asm(RV.LI(targetReg, value))
           Env = targetLoadRes.Env }
-
+    | Sub(lhs, rhs)
     | Add(lhs, rhs)
     | Mult(lhs, rhs) as expr ->
         /// Names of the variables used by the lhs and rhs of this operation
@@ -415,6 +415,8 @@ and internal doLetInitCodegen (env: ANFCodegenEnv) (init: TypedAST): ANFCodegenR
             /// Assembly code for the operation
             let opAsm =
                 match expr with
+                | Sub(_,_) -> Asm(RV.SUB(targetReg, lhsReg, rhsReg),
+                                   $"%s{env.TargetVar} <- %s{lrVarNames.[0]} - %s{lrVarNames.[1]}")
                 | Add(_,_) -> Asm(RV.ADD(targetReg, lhsReg, rhsReg),
                                   $"%s{env.TargetVar} <- %s{lrVarNames.[0]} + %s{lrVarNames.[1]}")
                 | Mult(_,_) -> Asm(RV.MUL(targetReg, lhsReg, rhsReg),
@@ -424,7 +426,25 @@ and internal doLetInitCodegen (env: ANFCodegenEnv) (init: TypedAST): ANFCodegenR
               Env = targetLoadRes.Env }
         | x ->
             failwith $"BUG: unexpected return value from 'loadVars': %O{x}"
-
+    | Neg(arg) ->
+        let (argReg, argLoadRes) = loadIntVar env (getVarName arg) []
+        let (targetReg, targetLoadRes) = loadIntVar argLoadRes.Env env.TargetVar [getVarName arg]
+        let opAsm = Asm(RV.SUB(targetReg, Reg.zero, argReg),
+                        $"%s{env.TargetVar} <- - %s{getVarName arg}")
+        { Asm = argLoadRes.Asm ++ targetLoadRes.Asm ++ opAsm
+          Env = targetLoadRes.Env }
+    | Not(arg) as expr when (expandType arg.Env arg.Type) = TBool ->
+        let (argReg, argLoadRes) = loadIntVar env (getVarName arg) []
+        let (targetReg, targetLoadRes) = loadIntVar argLoadRes.Env env.TargetVar [getVarName arg]
+        let opAsm =
+            match expr with
+            | Neg(_) -> Asm(RV.XORI(targetReg, argReg, Imm12(-1)),
+                             $"%s{env.TargetVar} <- - %s{getVarName arg}")
+            | Not(_) -> Asm(RV.XORI(targetReg, argReg, Imm12(1)),
+                             $"%s{env.TargetVar} <- not %s{getVarName arg}")
+            | x -> failwith $"BUG: unexpected operation %O{x}"
+        { Asm = argLoadRes.Asm ++ targetLoadRes.Asm ++ opAsm
+          Env = targetLoadRes.Env }
     | Eq(lhs, rhs)
     | Less(lhs, rhs) as expr when (expandType lhs.Env lhs.Type) = TInt ->
         /// Names of the variables used by the lhs and rhs of this operation

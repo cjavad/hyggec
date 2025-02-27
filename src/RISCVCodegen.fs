@@ -149,6 +149,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             /// Generated code for the numerical operation
             let opAsm =
                 match expr with
+                | Sub(_,_) ->
+                    Asm(RV.FSUB_S(FPReg.r(env.FPTarget),
+                                  FPReg.r(env.FPTarget), FPReg.r(rfptarget)))
                 | Add(_,_) ->
                     Asm(RV.FADD_S(FPReg.r(env.FPTarget),
                                   FPReg.r(env.FPTarget), FPReg.r(rfptarget)))
