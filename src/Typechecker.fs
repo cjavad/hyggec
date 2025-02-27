@@ -287,6 +287,11 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
                   Type = tpe
                   Expr = Mult(tlhs, trhs) }
         | Error(es) -> Error(es)
+    | Div(lhs, rhs) ->
+        match (binaryNumericalOpTyper "division" node.Pos env lhs rhs) with
+        | Ok(tpe, tlhs, trhs) ->
+            Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = Div(tlhs, trhs) }
+        | Error(es) -> Error(es)
 
     | And(lhs, rhs) ->
         match (binaryBooleanOpTyper "and" node.Pos env lhs rhs) with

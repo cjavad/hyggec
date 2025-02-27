@@ -102,7 +102,12 @@ and Expr<'E, 'T> =
     | Add of lhs: Node<'E, 'T> * rhs: Node<'E, 'T>
 
     /// Multiplication between lhs and rhs.
-    | Mult of lhs: Node<'E, 'T> * rhs: Node<'E, 'T>
+    | Mult of lhs: Node<'E,'T>
+            * rhs: Node<'E,'T>
+    
+    /// Division between lhs and rhs.
+    | Div of lhs: Node<'E, 'T>
+           * rhs: Node<'E, 'T>
 
     /// Logical and between lhs and rhs.
     | And of lhs: Node<'E, 'T> * rhs: Node<'E, 'T>

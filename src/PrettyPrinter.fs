@@ -104,6 +104,9 @@ let rec internal formatASTRec (node: AST.Node<'E,'T>): Tree =
     | FloatVal(value) -> mkTree $"FloatVal %f{value}" node []
     | StringVal(value) -> mkTree $"StringVal \"%s{value}\"" node []
     | Var(name) -> mkTree $"Var %s{name}" node []
+    | Div(lhs, rhs) ->
+        mkTree "Div" node [("lhs", formatASTRec lhs)
+                           ("rhs", formatASTRec rhs)]
     | Mult(lhs, rhs) ->
         mkTree "Mult" node [("lhs", formatASTRec lhs)
                             ("rhs", formatASTRec rhs)]
