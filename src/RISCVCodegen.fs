@@ -54,7 +54,10 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         Asm(RV.LI(Reg.r(env.Target), value), $"Bool value '%O{v}'")
 
     | IntVal(v) ->
-        Asm(RV.LI(Reg.r(env.Target), v))
+        if (v &&& ~~~0xfff = v) then
+            Asm(RV.LUI(Reg.r(env.Target), Imm20(v >>> 12)))
+        else
+            Asm(RV.LI(Reg.r(env.Target), v))
 
     | FloatVal(v) ->
         // We convert the float value into its bytes, and load it as immediate
