@@ -178,7 +178,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
     | BNot(arg) ->
         let aAsm = doCodegen env arg
         
-        let opAsm = Asm(RV.NOT(Reg.r(env.target), Reg.r(env.target)))
+        let opAsm = Asm(RV.NOT(Reg.r(env.Target), Reg.r(env.Target)))
 
         aAsm ++ opAsm
         
@@ -206,6 +206,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                 Asm(RV.SLL(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
             | BSR(_,_) ->
                 Asm(RV.SRL(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | x -> failwith $"BUG: unexpected operation %O{x}"
 
         lAsm ++ rAsm ++ opAsm
     | And(lhs, rhs)

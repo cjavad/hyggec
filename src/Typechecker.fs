@@ -244,33 +244,33 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
     | BNot(arg) ->
         match (typer env arg) with
         | Ok(targ) when (isSubtypeOf env targ.Type TInt) ->
-            Ok { Pos = node.Pos; Env = env; Type = targ.Type; Expr = Neg(targ) }
+            Ok { Pos = node.Pos; Env = env; Type = targ.Type; Expr = BNot(targ) }
         | Ok(targ) ->
             Error([(node.Pos, $"binary 'not': expected argument of type %O{TInt}, " + $"found %O{targ.Type}")])
         | Error(es) -> Error(es)
     | BAnd(lhs, rhs) ->
         match (binaryIntegerOpTyper "bitwise and" node.Pos env lhs rhs) with
-        | Ok(tpe, tlhs, trhs)
+        | Ok(tpe, tlhs, trhs) ->
             Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = BAnd(tlhs, trhs) }
         | Error(es) -> Error(es)
     | BOr(lhs, rhs) ->
         match (binaryIntegerOpTyper "bitwise or" node.Pos env lhs rhs) with
-        | Ok(tpe, tlhs, trhs)
+        | Ok(tpe, tlhs, trhs) ->
             Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = BOr(tlhs, trhs) }
         | Error(es) -> Error(es)
     | BXor(lhs, rhs) ->
         match (binaryIntegerOpTyper "bitwise xor" node.Pos env lhs rhs) with
-        | Ok(tpe, tlhs, trhs)
+        | Ok(tpe, tlhs, trhs) ->
             Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = BXor(tlhs, trhs) }
         | Error(es) -> Error(es)
     | BSL(lhs, rhs) ->
         match (binaryIntegerOpTyper "logical shift left" node.Pos env lhs rhs) with
-        | Ok(tpe, tlhs, trhs)
+        | Ok(tpe, tlhs, trhs) ->
             Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = BSL(tlhs, trhs) }
         | Error(es) -> Error(es)
     | BSR(lhs, rhs) ->
         match (binaryIntegerOpTyper "logical shift right" node.Pos env lhs rhs) with
-        | Ok(tpe, tlhs, trhs)
+        | Ok(tpe, tlhs, trhs) ->
             Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = BSR(tlhs, trhs) }
         | Error(es) -> Error(es)
     | And(lhs, rhs) ->
