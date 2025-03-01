@@ -122,6 +122,9 @@ let rec internal formatASTRec (node: AST.Node<'E,'T>): Tree =
     | Or(lhs, rhs) ->
         mkTree "Or" node [("lhs", formatASTRec lhs)
                           ("rhs", formatASTRec rhs)]
+    | Xor(lhs, rhs) ->
+        mkTree "Xor" node [("lhs", formatASTRec lhs)
+                           ("rhs", formatASTRec rhs)]
     | Not(arg) ->
         mkTree "Not" node [("arg", formatASTRec arg)]
     | Neg(arg) ->

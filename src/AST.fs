@@ -117,6 +117,10 @@ and Expr<'E,'T> =
     | Or of lhs: Node<'E,'T>
           * rhs: Node<'E,'T>
 
+    /// Logical xor between lhs and rhs.
+    | Xor of lhs: Node<'E, 'T>
+           * rhs: Node<'E, 'T>
+
     /// Logical not
     | Not of arg: Node<'E,'T>
     
