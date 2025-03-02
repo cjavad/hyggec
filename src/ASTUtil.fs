@@ -33,7 +33,8 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = Div((subst lhs var sub), (subst rhs var sub))}
     | Mult(lhs, rhs) ->
         {node with Expr = Mult((subst lhs var sub), (subst rhs var sub))}
-    
+    | Rem(lhs, rhs) ->
+        {node with Expr = Rem((subst lhs var sub), (subst rhs var sub))}
     | And(lhs, rhs) ->
         {node with Expr = And((subst lhs var sub), (subst rhs var sub))}
     | SCAnd(lhs, rhs) ->
@@ -160,6 +161,7 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
         Set.union (freeVars lhs) (freeVars rhs)
     | Div(lhs, rhs) ->
         Set.union (freeVars lhs) (freeVars rhs)
+    | Rem(lhs, rhs) 
     | Sub(lhs, rhs)
     | And(lhs, rhs)
     | SCAnd(lhs, rhs)
@@ -250,6 +252,7 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         Set.union (capturedVars lhs) (capturedVars rhs)
     | Div(lhs, rhs) ->
         Set.union (capturedVars lhs) (capturedVars rhs)
+    | Rem(lhs, rhs) 
     | And(lhs, rhs)
     | SCAnd(lhs, rhs)
     | Xor(lhs, rhs)

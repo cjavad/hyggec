@@ -48,7 +48,7 @@ let mkNode (parseState: IParseState, inputIdx: int, e: UntypedExpr): UntypedAST 
 %token <unit> LIT_UNIT
 
 // Tokens for arithmetic operators
-%token DIV TIMES PLUS MINUS
+%token REM DIV TIMES PLUS MINUS
 
 // Tokens for logical operators
 %token AND SCAND OR SCOR XOR NOT
@@ -202,6 +202,7 @@ addSubExpr:
 multExpr:
   | multExpr TIMES unaryExpr  { mkNode(parseState, 2, Expr.Mult($1, $3)) }
   | multExpr DIV unaryExpr    { mkNode(parseState, 2, Expr.Div($1, $3))  }
+  | multExpr REM unaryExpr    { mkNode(parseState, 2, Expr.Rem($1, $3))  }
   | unaryExpr                 { $1 }
 
 // Unary expression

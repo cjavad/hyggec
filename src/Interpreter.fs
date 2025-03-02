@@ -120,6 +120,13 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             match (reduceLhsRhs env lhs rhs) with
             | Some(env', lhs', rhs') -> Some(env', { node with Expr = Mult(lhs', rhs') })
             | None -> None
+    | Rem(lhs, rhs) ->
+        match (lhs.Expr, rhs.Expr) with
+        | (IntVal(v1), IntVal(v2)) -> Some(env, { node with Expr = IntVal(v1 % v2) })
+        | (_,_) ->
+            match (reduceLhsRhs env lhs rhs) with
+            | Some(env', lhs', rhs') -> Some(env', { node with Expr = Rem(lhs', rhs') })
+            | None -> None
     | Div(lhs, rhs) ->
         match (lhs.Expr, rhs.Expr) with
         | (IntVal(v1), IntVal(v2)) -> Some(env, { node with Expr = IntVal(v1 / v2) })
