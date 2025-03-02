@@ -58,7 +58,9 @@ rule tokenize = parse
 | "+"          { Parser.PLUS }
 | "-"          { Parser.MINUS }
 | "and"        { Parser.AND }
+| "scand"      { Parser.SCAND }
 | "or"         { Parser.OR }
+| "scor"       { Parser.SCOR }
 | "xor"        { Parser.XOR }
 | "not"        { Parser.NOT }
 | "="          { Parser.EQ }
