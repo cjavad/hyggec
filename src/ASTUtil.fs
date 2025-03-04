@@ -171,8 +171,6 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
     | SCOr(lhs, rhs)
     | Or(lhs, rhs) ->
         Set.union (freeVars lhs) (freeVars rhs)
-    | Xor(lhs, rhs) ->
-        Set.union (freeVars lhs) (freeVars rhs)
     | Sqrt(arg) -> freeVars arg
     | Not(arg) -> freeVars arg
     | Neg(arg) -> freeVars arg
@@ -263,8 +261,6 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
     | Xor(lhs, rhs)
     | SCOr(lhs, rhs)
     | Or(lhs, rhs) ->
-        Set.union (capturedVars lhs) (capturedVars rhs)
-    | Xor(lhs, rhs) -> 
         Set.union (capturedVars lhs) (capturedVars rhs)
     | Sqrt(arg) -> capturedVars arg
     | Not(arg) -> capturedVars arg
