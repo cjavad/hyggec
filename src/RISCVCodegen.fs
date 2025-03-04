@@ -181,9 +181,10 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
     | Sqrt(arg) ->
         let asm = doCodegen env arg
         match (arg.Type) with
-            | t when (isSubtypeOf arg.Env t TFloat) -> asm.AddText(RV.FSQRT_S(FPReg.r(env.FPTarget),
-                                                                              FPReg.r(env.FPTarget)))
-            | x -> failwith $"BUG: unexpected operation %O{x}"
+            | t when (isSubtypeOf arg.Env t TFloat) -> 
+                asm.AddText(RV.FSQRT_S(FPReg.r(env.FPTarget),
+                                       FPReg.r(env.FPTarget)))
+            | t -> failwith $"BUG: unexpected operation %O{t}"
     | And(lhs, rhs)
     | Xor(lhs, rhs)
     | SCAnd(lhs, rhs)
