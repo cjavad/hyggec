@@ -35,6 +35,8 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = Mult((subst lhs var sub), (subst rhs var sub))}
     | Rem(lhs, rhs) ->
         {node with Expr = Rem((subst lhs var sub), (subst rhs var sub))}
+    | Sqrt(arg) ->
+        {node with Expr = Sqrt(subst arg var sub)}
     | And(lhs, rhs) ->
         {node with Expr = And((subst lhs var sub), (subst rhs var sub))}
     | Or(lhs, rhs) ->
@@ -164,6 +166,7 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
         Set.union (freeVars lhs) (freeVars rhs)
     | Xor(lhs, rhs) ->
         Set.union (freeVars lhs) (freeVars rhs)
+    | Sqrt(arg) -> freeVars arg
     | Not(arg) -> freeVars arg
     | Neg(arg) -> freeVars arg
     | Eq(lhs, rhs)
@@ -253,6 +256,7 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         Set.union (capturedVars lhs) (capturedVars rhs)
     | Xor(lhs, rhs) -> 
         Set.union (capturedVars lhs) (capturedVars rhs)
+    | Sqrt(arg) -> capturedVars arg
     | Not(arg) -> capturedVars arg
     | Neg(arg) -> capturedVars arg
     | Eq(lhs, rhs)

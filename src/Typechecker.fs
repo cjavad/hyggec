@@ -246,7 +246,15 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
         | Ok(tpe, tlhs, trhs) ->
             Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = Rem(tlhs, trhs) }
         | Error(es) -> Error(es)
-
+    | Sqrt(arg) ->
+        match (typer env arg) with
+        | Ok(targ) when (isSubtypeOf env targ.Type TFloat) ->
+            Ok { Pos = node.Pos; Env = env; Type = TFloat; Expr = Sqrt(targ) }
+        | Ok(targ) ->
+            Error([(node.Pos, $"Operation 'sqrt': expected argument of type %O{TFloat}, "
+                              + $"found %O{targ.Type}")])
+        | Error(es) -> Error(es)
+        
     | And(lhs, rhs) ->
         match (binaryBooleanOpTyper "and" node.Pos env lhs rhs) with
         | Ok(tlhs, trhs) ->
