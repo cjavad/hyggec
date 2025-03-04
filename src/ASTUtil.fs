@@ -47,6 +47,8 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = BSL((subst lhs var sub), (subst rhs var sub))}
     | BSR(lhs, rhs) ->
         {node with Expr = BSR((subst lhs var sub), (subst rhs var sub))}
+    | Sqrt(arg) ->
+        {node with Expr = Sqrt(subst arg var sub)}
     | And(lhs, rhs) ->
         {node with Expr = And((subst lhs var sub), (subst rhs var sub))}
     | SCAnd(lhs, rhs) ->
@@ -187,6 +189,7 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
     | Or(lhs, rhs) ->
         Set.union (freeVars lhs) (freeVars rhs)
     | BNot(arg)
+    | Sqrt(arg) -> freeVars arg
     | Not(arg) -> freeVars arg
     | Neg(arg) -> freeVars arg
     | Eq(lhs, rhs)
@@ -283,6 +286,7 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
     | Or(lhs, rhs) ->
         Set.union (capturedVars lhs) (capturedVars rhs)
     | BNot(arg)
+    | Sqrt(arg) -> capturedVars arg
     | Not(arg) -> capturedVars arg
     | Neg(arg) -> capturedVars arg
     | Eq(lhs, rhs)

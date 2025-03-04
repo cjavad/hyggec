@@ -112,6 +112,9 @@ and Expr<'E,'T> =
     // Remainder between lhs and rhs
     | Rem of lhs: Node<'E, 'T>
            * rhs: Node<'E, 'T>
+    
+    // Square root
+    | Sqrt of arg: Node<'E, 'T>
 
     // Bitwise not of arg
     | BNot of arg: Node<'E, 'T>

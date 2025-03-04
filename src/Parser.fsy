@@ -47,7 +47,8 @@ let mkNode (parseState: IParseState, inputIdx: int, e: UntypedExpr): UntypedAST 
 %token <string> LIT_STRING
 %token <unit> LIT_UNIT
 
-// Tokens for arithmetic operators
+// Tokens for arithmetic operators and other functions
+%token SQRT
 %token REM DIV TIMES PLUS MINUS
 
 // Tokens for logical operators
@@ -221,6 +222,7 @@ multExpr:
 // Unary expression
 unaryExpr:
   | BNOT unaryExpr                { mkNode(parseState, 1, Expr.BNot($2)) }
+  | SQRT LPAR simpleExpr RPAR     { mkNode(parseState, 1, Expr.Sqrt($3)) }
   | NOT unaryExpr                 { mkNode(parseState, 1, Expr.Not($2)) }
   | MINUS unaryExpr               { mkNode(parseState, 1, Expr.Neg($2)) }
   | READ_INT LIT_UNIT             { mkNode(parseState, 1, Expr.ReadInt) }

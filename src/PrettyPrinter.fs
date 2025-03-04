@@ -136,6 +136,8 @@ let rec internal formatASTRec (node: AST.Node<'E,'T>): Tree =
     | BSR(lhs, rhs) ->
         mkTree "BSR" node [("lhs", formatASTRec lhs);
                            ("rhs", formatASTRec rhs)]
+    | Sqrt(arg) ->
+        mkTree "Sqrt" node [("arg"), formatASTRec arg]
     | And(lhs, rhs) ->
         mkTree "And" node [("lhs", formatASTRec lhs)
                            ("rhs", formatASTRec rhs)]

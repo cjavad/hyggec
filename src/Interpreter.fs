@@ -135,7 +135,13 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             match (reduceLhsRhs env lhs rhs) with
             | Some(env', lhs', rhs') -> Some(env', { node with Expr = Div(lhs', rhs') })
             | None -> None
-
+    | Sqrt(arg) ->
+        match (arg.Expr) with
+        | FloatVal(v) -> Some(env, { node with Expr = FloatVal(sqrt v) } )
+        | _ ->
+            match (reduce env arg) with
+            | Some(env', arg') -> Some(env', { node with Expr = Sqrt(arg') })
+            | None -> None
     | Add(lhs, rhs) ->
         match (lhs.Expr, rhs.Expr) with
         | (IntVal(v1), IntVal(v2)) -> Some(env, { node with Expr = IntVal(v1 + v2) })
