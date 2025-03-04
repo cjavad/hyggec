@@ -60,7 +60,11 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         {node with Expr = Rem((substVar lhs var var2), (substVar rhs var var2))}
     | And(lhs, rhs) ->
         {node with Expr = And((substVar lhs var var2), (substVar rhs var var2))}
+    | SCAnd(lhs, rhs) ->
+        {node with Expr = SCAnd((substVar lhs var var2), (substVar rhs var var2))}
     | Or(lhs, rhs) ->
+        {node with Expr = Or((substVar lhs var var2), (substVar rhs var var2))}
+    | SCOr(lhs, rhs) ->
         {node with Expr = Or((substVar lhs var var2), (substVar rhs var var2))}
     | Xor(lhs, rhs) ->
         {node with Expr = Xor((substVar lhs var var2), (substVar rhs var var2))}
@@ -207,7 +211,9 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
     | Div(lhs, rhs)
     | Rem(lhs, rhs)
     | And(lhs, rhs)
+    | SCAnd(lhs, rhs)
     | Or(lhs, rhs)
+    | SCOr(lhs, rhs)
     | Xor(lhs, rhs)
     | Eq(lhs, rhs)
     | Greater(lhs, rhs)

@@ -119,6 +119,14 @@ and Expr<'E,'T> =
     /// Logical and between lhs and rhs.
     | And of lhs: Node<'E,'T>
            * rhs: Node<'E,'T>
+    
+    /// Logical and between lhs and rhs.
+    | SCAnd of lhs: Node<'E,'T>
+             * rhs: Node<'E,'T>
+
+    /// Logical and between lhs and rhs.
+    | SCOr of lhs: Node<'E,'T>
+            * rhs: Node<'E,'T>
 
     /// Logical or between lhs and rhs.
     | Or of lhs: Node<'E,'T>

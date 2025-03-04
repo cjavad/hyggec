@@ -186,6 +186,8 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             | x -> failwith $"BUG: unexpected operation %O{x}"
     | And(lhs, rhs)
     | Xor(lhs, rhs)
+    | SCAnd(lhs, rhs)
+    | SCOr(lhs, rhs)
     | Or(lhs, rhs) as expr ->
         // Code generation for logical 'and' and 'or' is very similar: we
         // compile the lhs and rhs giving them different target registers, and
@@ -206,6 +208,10 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                 Asm(RV.OR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
             | Xor(_,_) ->
                 Asm(RV.XOR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | SCAnd(_,_) ->
+                Asm(RV.AND(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | SCOr(_,_) -> 
+                Asm(RV.OR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
             | x -> failwith $"BUG: unexpected operation %O{x}"
         // Put everything together
         lAsm ++ rAsm ++ opAsm

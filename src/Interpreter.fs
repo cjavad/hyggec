@@ -166,12 +166,30 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             | Some(env', lhs', rhs') -> Some(env', { node with Expr = And(lhs', rhs') })
             | None -> None
 
+    | SCAnd(lhs, rhs) ->
+        match (lhs.Expr, rhs.Expr) with
+        | (BoolVal(v1), BoolVal(v2)) when v1 -> Some(env, { node with Expr = BoolVal(v1 && v2)})
+        | (BoolVal(v1), BoolVal(v2)) -> Some(env, { node with Expr = BoolVal(false) })
+        | (_, _) ->
+            match (reduceLhsRhs env lhs rhs) with
+            | Some(env', lhs', rhs') -> Some(env', { node with Expr = SCAnd(lhs', rhs') })
+            | None -> None
+
     | Or(lhs, rhs) ->
         match (lhs.Expr, rhs.Expr) with
         | (BoolVal(v1), BoolVal(v2)) -> Some(env, { node with Expr = BoolVal(v1 || v2) })
         | (_, _) ->
             match (reduceLhsRhs env lhs rhs) with
             | Some(env', lhs', rhs') -> Some(env', { node with Expr = Or(lhs', rhs') })
+            | None -> None
+
+    | SCOr(lhs, rhs) ->
+        match (lhs.Expr, rhs.Expr) with
+        | (BoolVal(v1), BoolVal(v2)) when v1 -> Some(env, { node with Expr = BoolVal(true) })
+        | (BoolVal(v1), BoolVal(v2)) -> Some(env, { node with Expr = BoolVal(v1 || v2) })
+        | (_, _) ->
+            match (reduceLhsRhs env lhs rhs) with
+            | Some(env', lhs', rhs') -> Some(env', { node with Expr = SCOr(lhs', rhs') })
             | None -> None
     
     | Xor(lhs, rhs) ->

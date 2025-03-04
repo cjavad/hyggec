@@ -124,9 +124,15 @@ let rec internal formatASTRec (node: AST.Node<'E,'T>): Tree =
     | And(lhs, rhs) ->
         mkTree "And" node [("lhs", formatASTRec lhs)
                            ("rhs", formatASTRec rhs)]
+    | SCAnd(lhs, rhs) ->
+        mkTree "SCAnd" node [("lhs", formatASTRec lhs)
+                             ("rhs", formatASTRec rhs)]
     | Or(lhs, rhs) ->
         mkTree "Or" node [("lhs", formatASTRec lhs)
                           ("rhs", formatASTRec rhs)]
+    | SCOr(lhs, rhs) ->
+        mkTree "SCOr" node [("lhs", formatASTRec lhs)
+                            ("rhs", formatASTRec rhs)]
     | Xor(lhs, rhs) ->
         mkTree "Xor" node [("lhs", formatASTRec lhs)
                            ("rhs", formatASTRec rhs)]
