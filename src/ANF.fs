@@ -68,6 +68,8 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         {node with Expr = Or((substVar lhs var var2), (substVar rhs var var2))}
     | Xor(lhs, rhs) ->
         {node with Expr = Xor((substVar lhs var var2), (substVar rhs var var2))}
+    | Sqrt(arg) ->
+        {node with Expr = Sqrt(substVar arg var var2)}
     | Not(arg) ->
         {node with Expr = Not(substVar arg var var2)}
     | Neg(arg) ->
@@ -247,6 +249,7 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
         ({node with Expr = Var(anfDef.Var)}, [anfDef])
 
     | Not(arg)
+    | Sqrt(arg)
     | Neg(arg)
     | Print(arg)
     | PrintLn(arg)
@@ -255,6 +258,7 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
         let (argANF, argDefs) = toANFDefs arg
         /// This expression in ANF
         let anfExpr = match expr with
+                      | Sqrt(_) -> Sqrt(argANF)
                       | Not(_) -> Not(argANF)
                       | Neg(_) -> Neg(argANF)
                       | Print(_) -> Print(argANF)

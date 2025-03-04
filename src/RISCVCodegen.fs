@@ -178,7 +178,12 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             lAsm ++ rAsm ++ opAsm
         | t ->
             failwith $"BUG: numerical operation codegen invoked on invalid type %O{t}"
-
+    | Sqrt(arg) ->
+        let asm = doCodegen env arg
+        match (arg.Type) with
+            | t when (isSubtypeOf arg.Env t TFloat) -> asm.AddText(RV.FSQRT_S(FPReg.r(env.FPTarget),
+                                                                              FPReg.r(env.FPTarget)))
+            | x -> failwith $"BUG: unexpected operation %O{x}"
     | And(lhs, rhs)
     | Xor(lhs, rhs)
     | SCAnd(lhs, rhs)
