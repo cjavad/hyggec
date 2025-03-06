@@ -60,6 +60,9 @@ let mkNode (parseState: IParseState, inputIdx: int, e: UntypedExpr): UntypedAST 
 // Tokens for relational operators
 %token EQ LT GT LEQ GEQ
 
+// Tokens for increment/decrement operators
+%token PLUSPLUS 
+
 // Tokens for control flow
 %token IF THEN ELSE
 
@@ -225,6 +228,8 @@ unaryExpr:
   | SQRT LPAR simpleExpr RPAR     { mkNode(parseState, 1, Expr.Sqrt($3)) }
   | NOT unaryExpr                 { mkNode(parseState, 1, Expr.Not($2)) }
   | MINUS unaryExpr               { mkNode(parseState, 1, Expr.Neg($2)) }
+  | PLUSPLUS unaryExpr            { mkNode(parseState, 1, Expr.Preinc($2)) }
+  | ascriptionExpr PLUSPLUS       { mkNode(parseState, 1, Expr.Postinc($1)) }
   | READ_INT LIT_UNIT             { mkNode(parseState, 1, Expr.ReadInt) }
   | READ_INT LPAR RPAR            { mkNode(parseState, 1, Expr.ReadInt) }
   | READ_FLOAT LIT_UNIT           { mkNode(parseState, 1, Expr.ReadFloat) }

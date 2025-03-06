@@ -58,6 +58,7 @@ rule tokenize = parse
 | "/"          { Parser.DIV }
 | "*"          { Parser.TIMES }
 | "+"          { Parser.PLUS }
+| "++"         { Parser.PLUSPLUS}
 | "-"          { Parser.MINUS }
 | "and"        { Parser.AND }
 | "scand"      { Parser.SCAND }
