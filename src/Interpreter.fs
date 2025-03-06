@@ -8,6 +8,8 @@ module Interpreter
 
 open System
 open AST
+open Type
+open Typechecker
 
 
 /// Does the given AST node represent a value?
@@ -315,6 +317,7 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
                 | Some(env', arg2) -> Some(env', { node with Expr = Print(arg2) })
                 | None -> None
             | _ -> None
+    
 
     | PrintLn(arg) ->
         // We recycle the evaluation of 'Print', by rewriting this AST node
@@ -333,7 +336,30 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
                     Some(env', n)
             | _ -> failwith $"BUG: unexpected 'Print' reduction ${n}"
         | None -> None
-
+    
+    | Preinc(arg) ->
+        match (arg.Expr) with
+        | IntVal(v) ->
+            Some(env, { node with Expr = IntVal(v + 1) })
+        | FloatVal(v) ->
+            Some(env, { node with Expr = FloatVal(v + 1.0f) })
+        | _ ->
+            match (reduce env arg) with
+            | Some(env', arg') ->
+                Some(env', { node with Expr = Preinc(arg') })
+            | None -> None
+    | Postinc(arg) ->
+        match (arg.Expr) with
+        | IntVal(v) ->
+            Some(env, { node with Expr = IntVal(v + 1) })
+        | FloatVal(v) ->
+            Some(env, { node with Expr = FloatVal(v + 1.0f) })
+        | _ ->
+            match (reduce env arg) with
+            | Some(env', arg') ->
+                Some(env', { node with Expr = Postinc(arg') })
+            | None -> None
+    
     | If(cond, ifTrue, ifFalse) ->
         match cond.Expr with
         | BoolVal(v) ->

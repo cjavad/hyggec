@@ -171,7 +171,13 @@ and Expr<'E,'T> =
     /// Print the result of the 'Arg' expression on the console, with a final
     /// newline.
     | PrintLn of arg: Node<'E,'T>
-
+    
+    // Post-increment
+    | Preinc of arg: Node<'E, 'T>
+    
+    // Post-increment
+    | Postinc of arg: Node<'E, 'T>
+    
     /// Conditional expression (if ... then ... else ...).
     | If of condition: Node<'E,'T>
           * ifTrue: Node<'E,'T>

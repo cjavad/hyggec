@@ -161,6 +161,10 @@ let rec internal formatASTRec (node: AST.Node<'E,'T>): Tree =
         mkTree "Print" node [("arg", formatASTRec arg)]
     | PrintLn(arg) ->
         mkTree "PrintLn" node [("arg", formatASTRec arg)]
+    | Preinc(arg) ->
+        mkTree "Preinc" node [("arg", formatASTRec arg)]
+    | Postinc(arg) ->
+        mkTree "Postinc" node [("arg", formatASTRec arg)]
     | If(condition, ifTrue, ifFalse) ->
         mkTree "Conditional" node [("condition", formatASTRec condition);
                                    ("ifTrue", formatASTRec ifTrue)

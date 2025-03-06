@@ -393,7 +393,28 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                 (RV.ECALL, "")
             ])
             ++ (afterSysCall [Reg.a0] [])
-
+    | Preinc(arg) ->
+        let asm =
+            match (expandType arg.Env arg.Type) with
+            | t when (isSubtypeOf arg.Env t TInt) ->
+                let assign = { node with Expr = Assign(arg, { node with Expr = Add(arg, { node with Expr = IntVal(1) }) } ) }
+                (doCodegen env assign)
+            | t when (isSubtypeOf arg.Env t TFloat) ->
+                let assign = { node with Expr = Assign(arg, { node with Expr = Add(arg, { node with Expr = FloatVal(1.0f) }) } ) }
+                (doCodegen env assign)
+            | _ -> failwith"failed"
+        asm
+    | Postinc(arg) ->
+        let asm =
+            match (expandType arg.Env arg.Type) with
+            | t when (isSubtypeOf arg.Env t TInt) ->
+                let assign = { node with Expr = Assign(arg, { node with Expr = Add(arg, { node with Expr = IntVal(1) }) } ) }
+                (doCodegen env arg) ++ (doCodegen env assign)
+            | t when (isSubtypeOf arg.Env t TFloat) ->
+                let assign = { node with Expr = Assign(arg, { node with Expr = Add(arg, { node with Expr = FloatVal(1.0f) }) } ) }
+                (doCodegen env arg) ++ (doCodegen env assign)
+            | _ -> failwith"failed"
+        asm
     | If(condition, ifTrue, ifFalse) ->
         /// Label to jump to when the 'if' condition is true
         let labelTrue = Util.genSymbol "if_true"
