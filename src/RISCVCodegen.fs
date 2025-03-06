@@ -115,6 +115,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
     | Sub(lhs, rhs)
     | Add(lhs, rhs)
     | Div(lhs, rhs)
+    | Rem(lhs, rhs)
     | Mult(lhs, rhs) as expr ->
         // Code generation for addition and multiplication is very
         // similar: we compile the lhs and rhs giving them different target
@@ -144,6 +145,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                                    Reg.r(env.Target), Reg.r(rtarget)))
                     | Div(_,_) ->
                         Asm(RV.DIV(Reg.r(env.Target),
+                                   Reg.r(env.Target), Reg.r(rtarget)))
+                    | Rem(_,_) ->
+                        Asm(RV.REM(Reg.r(env.Target),
                                    Reg.r(env.Target), Reg.r(rtarget)))
                     | x -> failwith $"BUG: unexpected operation %O{x}"
             // Put everything together
@@ -175,7 +179,51 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         | t ->
             failwith $"BUG: numerical operation codegen invoked on invalid type %O{t}"
 
+    | BNot(arg) ->
+        let aAsm = doCodegen env arg
+        
+        let opAsm = Asm(RV.NOT(Reg.r(env.Target), Reg.r(env.Target)))
+
+        aAsm ++ opAsm
+        
+    | BAnd(lhs, rhs)
+    | BOr(lhs, rhs)
+    | BXor(lhs, rhs)
+    | BSL(lhs, rhs)
+    | BSR(lhs, rhs) as expr ->
+        /// Generated code for the lhs expression
+        let lAsm = doCodegen env lhs
+        /// Target register for the rhs expression
+        let rtarget = env.Target + 1u
+        /// Generated code for the rhs expression
+        let rAsm = doCodegen {env with Target = rtarget} rhs
+
+        let opAsm = 
+            match expr with
+            | BAnd(_,_) ->
+                Asm(RV.AND(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | BOr(_,_) ->
+                Asm(RV.OR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | BXor(_,_) ->
+                Asm(RV.XOR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | BSL(_,_) ->
+                Asm(RV.SLL(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | BSR(_,_) ->
+                Asm(RV.SRL(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | x -> failwith $"BUG: unexpected operation %O{x}"
+
+        lAsm ++ rAsm ++ opAsm
+    | Sqrt(arg) ->
+        let asm = doCodegen env arg
+        match (arg.Type) with
+            | t when (isSubtypeOf arg.Env t TFloat) -> 
+                asm.AddText(RV.FSQRT_S(FPReg.r(env.FPTarget),
+                                       FPReg.r(env.FPTarget)))
+            | t -> failwith $"BUG: unexpected operation %O{t}"
     | And(lhs, rhs)
+    | Xor(lhs, rhs)
+    | SCAnd(lhs, rhs)
+    | SCOr(lhs, rhs)
     | Or(lhs, rhs) as expr ->
         // Code generation for logical 'and' and 'or' is very similar: we
         // compile the lhs and rhs giving them different target registers, and
@@ -194,6 +242,12 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                 Asm(RV.AND(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
             | Or(_,_) ->
                 Asm(RV.OR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | Xor(_,_) ->
+                Asm(RV.XOR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | SCAnd(_,_) ->
+                Asm(RV.AND(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | SCOr(_,_) -> 
+                Asm(RV.OR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
             | x -> failwith $"BUG: unexpected operation %O{x}"
         // Put everything together
         lAsm ++ rAsm ++ opAsm
@@ -207,6 +261,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         let asm = doCodegen env arg
         asm.AddText(RV.NEG(Reg.r(env.Target), Reg.r(env.Target)))
     | Eq(lhs, rhs)
+    | Greater(lhs, rhs)
+    | LessEq(lhs, rhs)
+    | GreaterEq(lhs, rhs)
     | Less(lhs, rhs) as expr ->
         // Code generation for equality and less-than relations is very similar:
         // we compile the lhs and rhs giving them different target registers,
@@ -237,6 +294,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             let labelName = match expr with
                             | Eq(_,_) -> "eq"
                             | Less(_,_) -> "less"
+                            | Greater(_,_) -> "greater"
+                            | LessEq(_,_) -> "lesseq"
+                            | GreaterEq(_,_) -> "greatereq"
                             | x -> failwith $"BUG: unexpected operation %O{x}"
             /// Label to jump to when the comparison is true
             let trueLabel = Util.genSymbol $"%O{labelName}_true"
@@ -273,6 +333,12 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                     Asm(RV.FEQ_S(Reg.r(env.Target), FPReg.r(env.FPTarget), FPReg.r(rfptarget)))
                 | Less(_,_) ->
                     Asm(RV.FLT_S(Reg.r(env.Target), FPReg.r(env.FPTarget), FPReg.r(rfptarget)))
+                | LessEq(_,_) ->
+                    Asm(RV.FLE_S(Reg.r(env.Target), FPReg.r(env.FPTarget), FPReg.r(rfptarget)))
+                | Greater(_,_) ->
+                    Asm(RV.FLE_S(Reg.r(env.Target), FPReg.r(rfptarget), FPReg.r(env.FPTarget)))
+                | GreaterEq(_,_) ->
+                    Asm(RV.FLT_S(Reg.r(env.Target), FPReg.r(rfptarget), FPReg.r(env.FPTarget)))
                 | x -> failwith $"BUG: unexpected operation %O{x}"
             // Put everything together
             (lAsm ++ rAsm ++ opAsm)

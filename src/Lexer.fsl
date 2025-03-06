@@ -53,17 +53,31 @@ rule tokenize = parse
 | "."          { Parser.DOT }
 
 // Operators
+| "sqrt"       { Parser.SQRT }
+| "%"          { Parser.REM }
 | "/"          { Parser.DIV }
 | "*"          { Parser.TIMES }
 | "+"          { Parser.PLUS }
 | "-"          { Parser.MINUS }
 | "and"        { Parser.AND }
+| "scand"      { Parser.SCAND }
 | "or"         { Parser.OR }
+| "scor"       { Parser.SCOR }
+| "xor"        { Parser.XOR }
 | "not"        { Parser.NOT }
 | "="          { Parser.EQ }
 | "<"          { Parser.LT }
+| ">"          { Parser.GT }
+| "<="         { Parser.LEQ }
+| ">="         { Parser.GEQ }
 | "<-"         { Parser.LARROW }
 | "->"         { Parser.RARROW }
+| "~"          { Parser.BNOT }
+| "|"          { Parser.BOR }
+| "&"          { Parser.BAND }
+| "^"          { Parser.BXOR }
+| "<<"         { Parser.BSL }
+| ">>"         { Parser.BSR }
 
 // Parentheses and brackets
 | "("          { Parser.LPAR }

@@ -47,14 +47,18 @@ let mkNode (parseState: IParseState, inputIdx: int, e: UntypedExpr): UntypedAST 
 %token <string> LIT_STRING
 %token <unit> LIT_UNIT
 
-// Tokens for arithmetic operators
-%token DIV TIMES PLUS MINUS
+// Tokens for arithmetic operators and other functions
+%token SQRT
+%token REM DIV TIMES PLUS MINUS
 
 // Tokens for logical operators
-%token AND OR NOT
+%token AND SCAND OR SCOR XOR NOT
+
+// Tokens for bitwise operators
+%token BAND BOR BXOR BSL BSR BNOT
 
 // Tokens for relational operators
-%token EQ LT
+%token EQ LT GT LEQ GEQ
 
 // Tokens for control flow
 %token IF THEN ELSE
@@ -160,8 +164,23 @@ ifExpr:
 
 // Logical 'or' expression
 orExpr:
-  | orExpr OR andExpr  { mkNode(parseState, 2, Expr.Or($1, $3)) }
-  | andExpr            { $1 }
+  | orExpr OR scorExpr  { mkNode(parseState, 2, Expr.Or($1, $3)) }
+  | scorExpr            { $1 }
+
+// Logical short-curcuit 'or' expression
+scorExpr:
+  | scorExpr SCOR xorExpr  { mkNode(parseState, 2, Expr.Or($1, $3)) }
+  | xorExpr                { $1 }
+
+// Logical 'xor' expression
+xorExpr:
+  | xorExpr XOR scandExpr { mkNode(parseState, 2, Expr.Xor($1, $3)) }
+  | scandExpr             { $1 }
+
+// Logical 'and' expression
+scandExpr:
+  | scandExpr SCAND andExpr  { mkNode(parseState, 2, Expr.And($1, $3)) }
+  | andExpr                  { $1 }
 
 // Logical 'and' expression
 andExpr:
@@ -170,9 +189,23 @@ andExpr:
 
 // Relational expression
 relExpr:
-  | addSubExpr EQ addSubExpr { mkNode(parseState, 2, Expr.Eq($1, $3)) }
-  | addSubExpr LT addSubExpr { mkNode(parseState, 2, Expr.Less($1, $3)) }
-  | addSubExpr               { $1 }
+  | shiftExpr EQ shiftExpr { mkNode(parseState, 2, Expr.Eq($1, $3)) }
+  | shiftExpr LT shiftExpr { mkNode(parseState, 2, Expr.Less($1, $3)) }
+  | shiftExpr GT shiftExpr { mkNode(parseState, 2, Expr.Greater($1, $3)) }
+  | shiftExpr LEQ shiftExpr { mkNode(parseState, 2, Expr.LessEq($1, $3)) }
+  | shiftExpr GEQ shiftExpr { mkNode(parseState, 2, Expr.GreaterEq($1, $3)) }
+  | shiftExpr               { $1 }
+
+shiftExpr:
+  | shiftExpr BSL bitwiseExpr { mkNode(parseState, 2, Expr.BSL($1, $3)) }
+  | shiftExpr BSR bitwiseExpr { mkNode(parseState, 2, Expr.BSR($1, $3)) }
+  | bitwiseExpr               { $1 }
+
+bitwiseExpr:
+  | bitwiseExpr BAND addSubExpr { mkNode(parseState, 2, Expr.BAnd($1, $3)) }
+  | bitwiseExpr BOR addSubExpr  { mkNode(parseState, 2, Expr.BOr($1, $3)) }
+  | bitwiseExpr BXOR addSubExpr { mkNode(parseState, 2, Expr.BXor($1, $3)) }
+  | addSubExpr                  { $1 }
 
 
 // Additive expression
@@ -185,10 +218,13 @@ addSubExpr:
 multExpr:
   | multExpr TIMES unaryExpr  { mkNode(parseState, 2, Expr.Mult($1, $3)) }
   | multExpr DIV unaryExpr    { mkNode(parseState, 2, Expr.Div($1, $3))  }
+  | multExpr REM unaryExpr    { mkNode(parseState, 2, Expr.Rem($1, $3))  }
   | unaryExpr                 { $1 }
 
 // Unary expression
 unaryExpr:
+  | BNOT unaryExpr                { mkNode(parseState, 1, Expr.BNot($2)) }
+  | SQRT LPAR simpleExpr RPAR     { mkNode(parseState, 1, Expr.Sqrt($3)) }
   | NOT unaryExpr                                 { mkNode(parseState, 1, Expr.Not($2)) }
   | MINUS unaryExpr                               { mkNode(parseState, 1, Expr.Neg($2)) }
   | READ_INT LIT_UNIT                             { mkNode(parseState, 1, Expr.ReadInt) }
