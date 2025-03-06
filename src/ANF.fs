@@ -56,8 +56,12 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         {node with Expr = Mult((substVar lhs var var2), (substVar rhs var var2))}
     | Div(lhs, rhs) ->
         {node with Expr = Div((substVar lhs var var2), (substVar rhs var var2))}
+    | Rem(lhs, rhs) ->
+        {node with Expr = Rem((substVar lhs var var2), (substVar rhs var var2))}
     | And(lhs, rhs) ->
         {node with Expr = And((substVar lhs var var2), (substVar rhs var var2))}
+    | SCAnd(lhs, rhs) ->
+        {node with Expr = SCAnd((substVar lhs var var2), (substVar rhs var var2))}
     | Or(lhs, rhs) ->
         {node with Expr = Or((substVar lhs var var2), (substVar rhs var var2))}
     | BNot(arg) ->
@@ -72,6 +76,12 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         {node with Expr = BSL((substVar lhs var var2), (substVar rhs var var2))}
     | BSR(lhs, rhs) ->
         {node with Expr = BSR((substVar lhs var var2), (substVar rhs var var2))}
+    | SCOr(lhs, rhs) ->
+        {node with Expr = Or((substVar lhs var var2), (substVar rhs var var2))}
+    | Xor(lhs, rhs) ->
+        {node with Expr = Xor((substVar lhs var var2), (substVar rhs var var2))}
+    | Sqrt(arg) ->
+        {node with Expr = Sqrt(substVar arg var var2)}
     | Not(arg) ->
         {node with Expr = Not(substVar arg var var2)}
     | Neg(arg) ->
@@ -79,6 +89,12 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
     | Eq(lhs, rhs) ->
         {node with Expr = Eq((substVar lhs var var2), (substVar rhs var var2))}
     | Less(lhs, rhs) ->
+        {node with Expr = Less((substVar lhs var var2), (substVar rhs var var2))}
+    | LessEq(lhs, rhs) ->
+        {node with Expr = Less((substVar lhs var var2), (substVar rhs var var2))}
+    | Greater(lhs, rhs) ->
+        {node with Expr = Less((substVar lhs var var2), (substVar rhs var var2))}
+    | GreaterEq(lhs, rhs) ->
         {node with Expr = Less((substVar lhs var var2), (substVar rhs var var2))}
 
     | ReadInt
@@ -210,9 +226,16 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
     | Add(lhs, rhs)
     | Mult(lhs, rhs)
     | Div(lhs, rhs)
+    | Rem(lhs, rhs)
     | And(lhs, rhs)
+    | SCAnd(lhs, rhs)
     | Or(lhs, rhs)
+    | SCOr(lhs, rhs)
+    | Xor(lhs, rhs)
     | Eq(lhs, rhs)
+    | Greater(lhs, rhs)
+    | LessEq(lhs, rhs)
+    | GreaterEq(lhs, rhs)
     | Less(lhs, rhs) as expr ->
         /// Left-hand-side argument in ANF and related definitions
         let (lhsANF, lhsDefs) = toANFDefs lhs
@@ -231,6 +254,9 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
                       | And(_,_) -> And(lhsANF, rhsANF)
                       | Or(_,_) -> Or(lhsANF, rhsANF)
                       | Eq(_,_) -> Eq(lhsANF, rhsANF)
+                      | Greater(_,_) -> Greater(lhsANF, rhsANF)
+                      | LessEq(_,_) -> LessEq(lhsANF, rhsANF)
+                      | GreaterEq(_,_) -> GreaterEq(lhsANF, rhsANF)
                       | Less(_,_) -> Less(lhsANF, rhsANF)
                       | e -> failwith $"BUG: unexpected expression: %O{e}"
         /// Definition binding this expression in ANF to its variable
@@ -246,6 +272,7 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
 
     | BNot(arg)
     | Not(arg)
+    | Sqrt(arg)
     | Neg(arg)
     | Print(arg)
     | PrintLn(arg)
@@ -255,6 +282,7 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
         /// This expression in ANF
         let anfExpr = match expr with
                       | BNot(_) -> BNot(argANF)
+                      | Sqrt(_) -> Sqrt(argANF)
                       | Not(_) -> Not(argANF)
                       | Neg(_) -> Neg(argANF)
                       | Print(_) -> Print(argANF)

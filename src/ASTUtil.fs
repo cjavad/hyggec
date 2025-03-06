@@ -45,10 +45,20 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = BSL((subst lhs var sub), (subst rhs var sub))}
     | BSR(lhs, rhs) ->
         {node with Expr = BSR((subst lhs var sub), (subst rhs var sub))}
+    | Rem(lhs, rhs) ->
+        {node with Expr = Rem((subst lhs var sub), (subst rhs var sub))}
+    | Sqrt(arg) ->
+        {node with Expr = Sqrt(subst arg var sub)}
     | And(lhs, rhs) ->
         {node with Expr = And((subst lhs var sub), (subst rhs var sub))}
+    | SCAnd(lhs, rhs) ->
+        {node with Expr = SCAnd((subst lhs var sub), (subst rhs var sub))}
     | Or(lhs, rhs) ->
         {node with Expr = Or((subst lhs var sub), (subst rhs var sub))}
+    | SCOr(lhs, rhs) ->
+        {node with Expr = SCOr((subst lhs var sub), (subst rhs var sub))}
+    | Xor(lhs, rhs) ->
+        {node with Expr = Xor((subst lhs var sub), (subst rhs var sub))}
     | Not(arg) ->
         {node with Expr = Not(subst arg var sub)}
     | Neg(arg) ->
@@ -57,6 +67,12 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = Eq((subst lhs var sub), (subst rhs var sub))}
     | Less(lhs, rhs) ->
         {node with Expr = Less((subst lhs var sub), (subst rhs var sub))}
+    | LessEq(lhs, rhs) ->
+        {node with Expr = LessEq((subst lhs var sub), (subst rhs var sub))}
+    | Greater(lhs, rhs) ->
+        {node with Expr = Greater((subst lhs var sub), (subst rhs var sub))}
+    | GreaterEq(lhs, rhs) ->
+        {node with Expr = GreaterEq((subst lhs var sub), (subst rhs var sub))}
 
     | ReadInt
     | ReadFloat -> node // The substitution has no effect
@@ -164,15 +180,26 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
     | BXor(lhs, rhs)
     | BSL(lhs, rhs)
     | BSR(lhs, rhs)
+    | Rem(lhs, rhs) 
     | Sub(lhs, rhs)
     | And(lhs, rhs)
+    | SCAnd(lhs, rhs)
+    | Xor(lhs, rhs)
+    | SCOr(lhs, rhs)
     | Or(lhs, rhs) ->
         Set.union (freeVars lhs) (freeVars rhs)
     | BNot(arg)
+    | Sqrt(arg) -> freeVars arg
     | Not(arg) -> freeVars arg
     | Neg(arg) -> freeVars arg
     | Eq(lhs, rhs)
     | Less(lhs, rhs) ->
+        Set.union (freeVars lhs) (freeVars rhs)
+    | LessEq(lhs, rhs) ->
+        Set.union (freeVars lhs) (freeVars rhs)
+    | Greater(lhs, rhs) ->
+        Set.union (freeVars lhs) (freeVars rhs)
+    | GreaterEq(lhs, rhs) ->
         Set.union (freeVars lhs) (freeVars rhs)
     | ReadInt
     | ReadFloat -> Set[]
@@ -251,14 +278,25 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         Set.union (capturedVars lhs) (capturedVars rhs)
     | Div(lhs, rhs) ->
         Set.union (capturedVars lhs) (capturedVars rhs)
+    | Rem(lhs, rhs) 
     | And(lhs, rhs)
+    | SCAnd(lhs, rhs)
+    | Xor(lhs, rhs)
+    | SCOr(lhs, rhs)
     | Or(lhs, rhs) ->
         Set.union (capturedVars lhs) (capturedVars rhs)
     | BNot(arg)
+    | Sqrt(arg) -> capturedVars arg
     | Not(arg) -> capturedVars arg
     | Neg(arg) -> capturedVars arg
     | Eq(lhs, rhs)
     | Less(lhs, rhs) ->
+        Set.union (capturedVars lhs) (capturedVars rhs)
+    | LessEq(lhs, rhs) ->
+        Set.union (capturedVars lhs) (capturedVars rhs)
+    | Greater(lhs, rhs) ->
+        Set.union (capturedVars lhs) (capturedVars rhs)
+    | GreaterEq(lhs, rhs) ->
         Set.union (capturedVars lhs) (capturedVars rhs)
     | ReadInt
     | ReadFloat -> Set[]

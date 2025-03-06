@@ -273,16 +273,48 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
         | Ok(tpe, tlhs, trhs) ->
             Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = BSR(tlhs, trhs) }
         | Error(es) -> Error(es)
+    | Rem(lhs, rhs) ->
+        match (binaryNumericalOpTyper "remainder" node.Pos env lhs rhs) with
+        | Ok(tpe, tlhs, trhs) ->
+            Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = Rem(tlhs, trhs) }
+        | Error(es) -> Error(es)
+    | Sqrt(arg) ->
+        match (typer env arg) with
+        | Ok(targ) when (isSubtypeOf env targ.Type TFloat) ->
+            Ok { Pos = node.Pos; Env = env; Type = TFloat; Expr = Sqrt(targ) }
+        | Ok(targ) ->
+            Error([(node.Pos, $"Operation 'sqrt': expected argument of type %O{TFloat}, "
+                              + $"found %O{targ.Type}")])
+        | Error(es) -> Error(es)
+        
     | And(lhs, rhs) ->
         match (binaryBooleanOpTyper "and" node.Pos env lhs rhs) with
         | Ok(tlhs, trhs) ->
             Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = And(tlhs, trhs) }
         | Error(es) -> Error(es)
 
+    | SCAnd(lhs, rhs) ->
+        match (binaryBooleanOpTyper "and" node.Pos env lhs rhs) with
+        | Ok(tlhs, trhs) ->
+            Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = SCAnd(tlhs, trhs) }
+        | Error(es) -> Error(es)
+
     | Or(lhs, rhs) ->
         match (binaryBooleanOpTyper "or" node.Pos env lhs rhs) with
         | Ok(tlhs, trhs) ->
             Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = Or(tlhs, trhs) }
+        | Error(es) -> Error(es)
+
+    | SCOr(lhs, rhs) ->
+        match (binaryBooleanOpTyper "or" node.Pos env lhs rhs) with
+        | Ok(tlhs, trhs) ->
+            Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = SCOr(tlhs, trhs) }
+        | Error(es) -> Error(es)
+
+    | Xor(lhs, rhs) ->
+        match (binaryBooleanOpTyper "xor" node.Pos env lhs rhs) with
+        | Ok(tlhs, trhs) ->
+            Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = Xor(tlhs, trhs) }
         | Error(es) -> Error(es)
 
     | Not(arg) ->
@@ -310,6 +342,24 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
 
     | Less(lhs, rhs) ->
         match (numericalRelationTyper "less than" node.Pos env lhs rhs) with
+        | Ok(tlhs, trhs) ->
+            Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = Less(tlhs, trhs) }
+        | Error(es) -> Error(es)
+
+    | LessEq(lhs, rhs) ->
+        match (numericalRelationTyper "less than or equals" node.Pos env lhs rhs) with
+        | Ok(tlhs, trhs) ->
+            Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = Less(tlhs, trhs) }
+        | Error(es) -> Error(es)
+    
+    | Greater(lhs, rhs) ->
+        match (numericalRelationTyper "Greater than" node.Pos env lhs rhs) with
+        | Ok(tlhs, trhs) ->
+            Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = Less(tlhs, trhs) }
+        | Error(es) -> Error(es)
+
+    | GreaterEq(lhs, rhs) ->
+        match (numericalRelationTyper "greater than or equals" node.Pos env lhs rhs) with
         | Ok(tlhs, trhs) ->
             Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = Less(tlhs, trhs) }
         | Error(es) -> Error(es)

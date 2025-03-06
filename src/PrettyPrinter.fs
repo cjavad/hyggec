@@ -104,6 +104,9 @@ let rec internal formatASTRec (node: AST.Node<'E,'T>): Tree =
     | FloatVal(value) -> mkTree $"FloatVal %f{value}" node []
     | StringVal(value) -> mkTree $"StringVal \"%s{value}\"" node []
     | Var(name) -> mkTree $"Var %s{name}" node []
+    | Rem(lhs, rhs) ->
+        mkTree "Rem" node [("lhs", formatASTRec lhs)
+                           ("rhs", formatASTRec rhs)]
     | Div(lhs, rhs) ->
         mkTree "Div" node [("lhs", formatASTRec lhs)
                            ("rhs", formatASTRec rhs)]
@@ -133,12 +136,23 @@ let rec internal formatASTRec (node: AST.Node<'E,'T>): Tree =
     | BSR(lhs, rhs) ->
         mkTree "BSR" node [("lhs", formatASTRec lhs);
                            ("rhs", formatASTRec rhs)]
+    | Sqrt(arg) ->
+        mkTree "Sqrt" node [("arg"), formatASTRec arg]
     | And(lhs, rhs) ->
         mkTree "And" node [("lhs", formatASTRec lhs)
                            ("rhs", formatASTRec rhs)]
+    | SCAnd(lhs, rhs) ->
+        mkTree "SCAnd" node [("lhs", formatASTRec lhs)
+                             ("rhs", formatASTRec rhs)]
     | Or(lhs, rhs) ->
         mkTree "Or" node [("lhs", formatASTRec lhs)
                           ("rhs", formatASTRec rhs)]
+    | SCOr(lhs, rhs) ->
+        mkTree "SCOr" node [("lhs", formatASTRec lhs)
+                            ("rhs", formatASTRec rhs)]
+    | Xor(lhs, rhs) ->
+        mkTree "Xor" node [("lhs", formatASTRec lhs)
+                           ("rhs", formatASTRec rhs)]
     | Not(arg) ->
         mkTree "Not" node [("arg", formatASTRec arg)]
     | Neg(arg) ->
@@ -149,6 +163,15 @@ let rec internal formatASTRec (node: AST.Node<'E,'T>): Tree =
     | Less(lhs, rhs) ->
         mkTree "Less" node [("lhs", formatASTRec lhs)
                             ("rhs", formatASTRec rhs)]
+    | LessEq(lhs, rhs) ->
+        mkTree "LessEq" node [("lhs", formatASTRec lhs)
+                              ("rhs", formatASTRec rhs)]
+    | Greater(lhs, rhs) ->
+        mkTree "Greater" node [("lhs", formatASTRec lhs)
+                               ("rhs", formatASTRec rhs)]
+    | GreaterEq(lhs, rhs) ->
+        mkTree "GreaterEq" node [("lhs", formatASTRec lhs)
+                                 ("rhs", formatASTRec rhs)]
     | ReadInt -> mkTree "ReadInt" node []
     | ReadFloat -> mkTree "ReadFloat" node []
     | Print(arg) ->
