@@ -72,6 +72,12 @@ rule tokenize = parse
 | ">="         { Parser.GEQ }
 | "<-"         { Parser.LARROW }
 | "->"         { Parser.RARROW }
+| "~"          { Parser.BNOT }
+| "|"          { Parser.BOR }
+| "&"          { Parser.BAND }
+| "^"          { Parser.BXOR }
+| "<<"         { Parser.BSL }
+| ">>"         { Parser.BSR }
 
 // Parentheses and brackets
 | "("          { Parser.LPAR }

@@ -119,6 +119,23 @@ let rec internal formatASTRec (node: AST.Node<'E,'T>): Tree =
     | Sub(lhs, rhs) ->
         mkTree "Sub" node [("lhs", formatASTRec lhs)
                            ("rhs", formatASTRec rhs)]
+    | BNot(arg) ->
+        mkTree "BNot" node [("arg", formatASTRec arg)]
+    | BAnd(lhs, rhs) ->
+        mkTree "BAnd" node [("lhs", formatASTRec lhs);
+                            ("rhs", formatASTRec rhs)]
+    | BOr(lhs, rhs) ->
+        mkTree "BOr" node [("lhs", formatASTRec lhs);
+                           ("rhs", formatASTRec rhs)]
+    | BXor(lhs, rhs) ->
+        mkTree "BXor" node [("lhs", formatASTRec lhs);
+                            ("rhs", formatASTRec rhs)]
+    | BSL(lhs, rhs) ->
+        mkTree "BSL" node [("lhs", formatASTRec lhs);
+                           ("rhs", formatASTRec rhs)]
+    | BSR(lhs, rhs) ->
+        mkTree "BSR" node [("lhs", formatASTRec lhs);
+                           ("rhs", formatASTRec rhs)]
     | Sqrt(arg) ->
         mkTree "Sqrt" node [("arg"), formatASTRec arg]
     | And(lhs, rhs) ->

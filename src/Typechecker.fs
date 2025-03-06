@@ -241,6 +241,38 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
         | Ok(tpe, tlhs, trhs) ->
             Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = Div(tlhs, trhs) }
         | Error(es) -> Error(es)
+    | BNot(arg) ->
+        match (typer env arg) with
+        | Ok(targ) when (isSubtypeOf env targ.Type TInt) ->
+            Ok { Pos = node.Pos; Env = env; Type = targ.Type; Expr = BNot(targ) }
+        | Ok(targ) ->
+            Error([(node.Pos, $"binary 'not': expected argument of type %O{TInt}, " + $"found %O{targ.Type}")])
+        | Error(es) -> Error(es)
+    | BAnd(lhs, rhs) ->
+        match (binaryIntegerOpTyper "bitwise and" node.Pos env lhs rhs) with
+        | Ok(tpe, tlhs, trhs) ->
+            Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = BAnd(tlhs, trhs) }
+        | Error(es) -> Error(es)
+    | BOr(lhs, rhs) ->
+        match (binaryIntegerOpTyper "bitwise or" node.Pos env lhs rhs) with
+        | Ok(tpe, tlhs, trhs) ->
+            Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = BOr(tlhs, trhs) }
+        | Error(es) -> Error(es)
+    | BXor(lhs, rhs) ->
+        match (binaryIntegerOpTyper "bitwise xor" node.Pos env lhs rhs) with
+        | Ok(tpe, tlhs, trhs) ->
+            Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = BXor(tlhs, trhs) }
+        | Error(es) -> Error(es)
+    | BSL(lhs, rhs) ->
+        match (binaryIntegerOpTyper "logical shift left" node.Pos env lhs rhs) with
+        | Ok(tpe, tlhs, trhs) ->
+            Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = BSL(tlhs, trhs) }
+        | Error(es) -> Error(es)
+    | BSR(lhs, rhs) ->
+        match (binaryIntegerOpTyper "logical shift right" node.Pos env lhs rhs) with
+        | Ok(tpe, tlhs, trhs) ->
+            Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = BSR(tlhs, trhs) }
+        | Error(es) -> Error(es)
     | Rem(lhs, rhs) ->
         match (binaryNumericalOpTyper "remainder" node.Pos env lhs rhs) with
         | Ok(tpe, tlhs, trhs) ->
@@ -695,6 +727,22 @@ and internal binaryNumericalOpTyper descr pos (env: TypingEnv)
     | (Ok(t1), Ok(t2)) ->
         Error([(pos, $"%s{descr}: expected arguments of a same type "
                      + $"between %O{TInt} or %O{TFloat}, "
+                     + $"found %O{t1.Type} and %O{t2.Type}")])
+    | otherwise -> mergeErrors otherwise
+
+/// It like the function above but only integer
+and internal binaryIntegerOpTyper descr pos (env: TypingEnv)
+                                    (lhs: UntypedAST)
+                                    (rhs: UntypedAST): Result<Type * TypedAST * TypedAST, TypeErrors> =
+    let tlhs = typer env lhs
+    let trhs = typer env rhs
+    match (tlhs, trhs) with
+    | (Ok(ln), Ok(rn)) when (isSubtypeOf env ln.Type TInt)
+                            && (isSubtypeOf env rn.Type TInt) ->
+        Ok(TInt, ln, rn)
+    | (Ok(t1), Ok(t2)) ->
+        Error([(pos, $"%s{descr}: expected arguments of a same type "
+                     + $"between %O{TInt}, "
                      + $"found %O{t1.Type} and %O{t2.Type}")])
     | otherwise -> mergeErrors otherwise
 

@@ -178,6 +178,41 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             lAsm ++ rAsm ++ opAsm
         | t ->
             failwith $"BUG: numerical operation codegen invoked on invalid type %O{t}"
+
+    | BNot(arg) ->
+        let aAsm = doCodegen env arg
+        
+        let opAsm = Asm(RV.NOT(Reg.r(env.Target), Reg.r(env.Target)))
+
+        aAsm ++ opAsm
+        
+    | BAnd(lhs, rhs)
+    | BOr(lhs, rhs)
+    | BXor(lhs, rhs)
+    | BSL(lhs, rhs)
+    | BSR(lhs, rhs) as expr ->
+        /// Generated code for the lhs expression
+        let lAsm = doCodegen env lhs
+        /// Target register for the rhs expression
+        let rtarget = env.Target + 1u
+        /// Generated code for the rhs expression
+        let rAsm = doCodegen {env with Target = rtarget} rhs
+
+        let opAsm = 
+            match expr with
+            | BAnd(_,_) ->
+                Asm(RV.AND(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | BOr(_,_) ->
+                Asm(RV.OR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | BXor(_,_) ->
+                Asm(RV.XOR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | BSL(_,_) ->
+                Asm(RV.SLL(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | BSR(_,_) ->
+                Asm(RV.SRL(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | x -> failwith $"BUG: unexpected operation %O{x}"
+
+        lAsm ++ rAsm ++ opAsm
     | Sqrt(arg) ->
         let asm = doCodegen env arg
         match (arg.Type) with
