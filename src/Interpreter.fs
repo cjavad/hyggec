@@ -393,34 +393,22 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
         | None -> None
     
     | Preinc(arg) ->
-        match (arg) with
-        | { Expr = Var(name) } when env.Mutables.ContainsKey(name) ->
-            let currentVal = env.Mutables[name]
-            match currentVal.Expr with
-            | IntVal(v) ->
-                let env' = { env with Mutables = env.Mutables.Add(name, { currentVal with Expr = IntVal(v + 1) }) }
-                Some(env', { node with Expr = IntVal(v + 1) })
-            | FloatVal(v) ->
-                let env' = { env with Mutables = env.Mutables.Add(name, { currentVal with Expr = FloatVal(v + 1.0f) }) }
-                Some(env', { node with Expr = FloatVal(v + 1.0f) })
-            | _ -> None
+        match (arg.Expr) with
+        | IntVal(v) ->
+            Some(env, { node with Expr = IntVal(v + 1) })
+        | FloatVal(v) ->
+            Some(env, { node with Expr = FloatVal(v + 1.0f) })
         | _ ->
             match (reduce env arg) with
             | Some(env', arg') ->
                 Some(env', { node with Expr = Preinc(arg') })
             | None -> None
     | Postinc(arg) ->
-       match (arg) with
-       | { Expr = Var(name) } when env.Mutables.ContainsKey(name) ->
-            let currentVal = env.Mutables[name]
-            match currentVal.Expr with
-            | IntVal(v) ->
-                let env' = { env with Mutables = env.Mutables.Add(name, { currentVal with Expr = IntVal(v + 1) }) }
-                Some(env', { node with Expr = IntVal(v) })
-            | FloatVal(v) ->
-                let env' = { env with Mutables = env.Mutables.Add(name, { currentVal with Expr = FloatVal(v + 1.0f) }) }
-                Some(env', { node with Expr = FloatVal(v) })
-            | _ -> None
+        match (arg.Expr) with
+        | IntVal(v) ->
+            Some(env, { node with Expr = IntVal(v + 1) })
+        | FloatVal(v) ->
+            Some(env, { node with Expr = FloatVal(v + 1.0f) })
         | _ ->
             match (reduce env arg) with
             | Some(env', arg') ->

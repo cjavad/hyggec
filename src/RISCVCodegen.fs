@@ -460,56 +460,27 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             ])
             ++ (afterSysCall [Reg.a0] [])
     | Preinc(arg) ->
-        match (arg.Expr) with
-        | Var(name) ->
-            match env.VarStorage.TryFind name with
-            | Some(_) ->
-                match (expandType arg.Env arg.Type) with
-                | t when (isSubtypeOf arg.Env t TInt) ->
-                    let addNode = { node with Expr = Add(arg, { node with Expr = IntVal(1) }) }
-                    let assignNode = { node with Expr = Assign(arg, addNode) }
-                    doCodegen env assignNode
-                | t when (isSubtypeOf arg.Env t TFloat) ->
-                    let addNode = { node with Expr = Add(arg, { node with Expr = FloatVal(1.0f) }) }
-                    let assignNode = { node with Expr = Assign(arg, addNode) }
-                    doCodegen env assignNode
-                | _ -> failwith $"Preinc on variable with unsupported type"
-            | None -> failwith $"Preinc on undeclared or immut variable"
-        | _ -> failwith $"Preinc only works on mut"
+        let asm =
+            match (expandType arg.Env arg.Type) with
+            | t when (isSubtypeOf arg.Env t TInt) ->
+                let assign = { node with Expr = Assign(arg, { node with Expr = Add(arg, { node with Expr = IntVal(1) }) } ) }
+                (doCodegen env assign)
+            | t when (isSubtypeOf arg.Env t TFloat) ->
+                let assign = { node with Expr = Assign(arg, { node with Expr = Add(arg, { node with Expr = FloatVal(1.0f) }) } ) }
+                (doCodegen env assign)
+            | _ -> failwith"failed"
+        asm
     | Postinc(arg) ->
-        match (arg.Expr) with
-        | Var(name) ->
-            match env.VarStorage.TryFind name with
-            | Some(_) ->
-                match (expandType arg.Env arg.Type) with
-                | t when (isSubtypeOf arg.Env t TInt) ->
-                    // x++ is more interesting than ++x
-                    // First, we load the original value to env.Target
-                    let origCode = doCodegen env arg
-                    // We make node to for addition between x and int 1
-                    let addNode = { node with Expr = Add(arg, { node with Expr = IntVal(1) }) }
-                    // Node's responsibility is to assign x with the node x + 1
-                    let assignNode = { node with Expr = Assign(arg, addNode) }
-                    // We need to generate a new target (env.Target + 1u) for x + 1 so the original doesn't
-                    // get overwritten because otherwise it would just be a preincrement
-                    let assignCode = doCodegen { env with Target = env.Target + 1u } assignNode
-                    // We combine the two coding sequences to accomplish the goal of postinc
-                    // As mentioned we set the env.Target to x
-                    // The next code sequence sets env.Target + 1u to x + 1 and assigns it back to x
-                    // The result is that the original value is returned and x is updated
-                    origCode ++ assignCode
-                | t when (isSubtypeOf arg.Env t TFloat) ->
-                    // Same as the one above but floaty :D
-                    let origCode = doCodegen env arg
-                    let addNode = { node with Expr = Add(arg, { node with Expr = FloatVal(1.0f) }) }
-                    let assignNode = { node with Expr = Assign(arg, addNode) }
-                    let assignCode = doCodegen { env with FPTarget = env.FPTarget + 1u } assignNode
-                    origCode ++ assignCode
-                    // Will make error messages better
-                | _ -> failwith $"Postinc on variable with unsupported type"
-            | None -> failwith $"Postinc on undeclared or immut variable"
-        | _ -> failwith $"Postinc only works on mut" 
-        
+        let asm =
+            match (expandType arg.Env arg.Type) with
+            | t when (isSubtypeOf arg.Env t TInt) ->
+                let assign = { node with Expr = Assign(arg, { node with Expr = Add(arg, { node with Expr = IntVal(1) }) } ) }
+                (doCodegen env arg) ++ (doCodegen env assign)
+            | t when (isSubtypeOf arg.Env t TFloat) ->
+                let assign = { node with Expr = Assign(arg, { node with Expr = Add(arg, { node with Expr = FloatVal(1.0f) }) } ) }
+                (doCodegen env arg) ++ (doCodegen env assign)
+            | _ -> failwith"failed"
+        asm
     | If(condition, ifTrue, ifFalse) ->
         /// Label to jump to when the 'if' condition is true
         let labelTrue = Util.genSymbol "if_true"
