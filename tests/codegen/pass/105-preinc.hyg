@@ -1,0 +1,6 @@
+let mutable x = 68;
+let mutable y = 0;
+y <- ++x;
+assert(y = 69);
+assert(x = 69)
+
