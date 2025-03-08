@@ -483,17 +483,29 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             | Some(_) ->
                 match (expandType arg.Env arg.Type) with
                 | t when (isSubtypeOf arg.Env t TInt) ->
-                    let varCode = doCodegen env arg
+                    // x++ is more interesting than ++x
+                    // First, we load the original value to env.Target
+                    let origCode = doCodegen env arg
+                    // We make node to for addition between x and int 1
                     let addNode = { node with Expr = Add(arg, { node with Expr = IntVal(1) }) }
+                    // Node's responsibility is to assign x with the node x + 1
                     let assignNode = { node with Expr = Assign(arg, addNode) }
+                    // We need to generate a new target (env.Target + 1u) for x + 1 so the original doesn't
+                    // get overwritten because otherwise it would just be a preincrement
                     let assignCode = doCodegen { env with Target = env.Target + 1u } assignNode
-                    varCode ++ assignCode
+                    // We combine the two coding sequences to accomplish the goal of postinc
+                    // As mentioned we set the env.Target to x
+                    // The next code sequence sets env.Target + 1u to x + 1 and assigns it back to x
+                    // The result is that the original value is returned and x is updated
+                    origCode ++ assignCode
                 | t when (isSubtypeOf arg.Env t TFloat) ->
-                    let varCode = doCodegen env arg
+                    // Same as the one above but floaty :D
+                    let origCode = doCodegen env arg
                     let addNode = { node with Expr = Add(arg, { node with Expr = FloatVal(1.0f) }) }
                     let assignNode = { node with Expr = Assign(arg, addNode) }
                     let assignCode = doCodegen { env with FPTarget = env.FPTarget + 1u } assignNode
-                    varCode ++ assignCode
+                    origCode ++ assignCode
+                    // Will make error messages better
                 | _ -> failwith $"Postinc on variable with unsupported type"
             | None -> failwith $"Postinc on undeclared or immut variable"
         | _ -> failwith $"Postinc only works on mut" 
