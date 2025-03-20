@@ -165,6 +165,12 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
             else (lab, v, (subst cont var sub))
         let cases2 = List.map substCase cases
         {node with Expr = Match((subst expr var sub), cases2)}
+    | Array(length, data) ->
+        {node with Expr = Array((subst length var sub), (subst data var sub))}
+    | ArrayLength(arr) ->
+        {node with Expr = ArrayLength(subst arr var sub)}
+    | ArrayElem(arr, index) ->
+        {node with Expr = ArrayElem((subst arr var sub), (subst index var sub))}
 
 /// Compute the set of free variables in the given AST node.
 let rec freeVars (node: Node<'E,'T>): Set<string> =
@@ -253,6 +259,12 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
         /// Free variables in all match continuations
         let fvConts = List.fold folder Set[] cases
         Set.union (freeVars expr) fvConts
+    | Array(length, data) ->
+        Set.union (freeVars length) (freeVars data)
+    | ArrayLength(arr) ->
+        freeVars arr
+    | ArrayElem(arr, index) ->
+        Set.union (freeVars arr) (freeVars index)
 
 /// Compute the union of the free variables in a list of AST nodes.
 and internal freeVarsInList (nodes: List<Node<'E,'T>>): Set<string> =
@@ -347,6 +359,12 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         /// Captured variables in all match continuations
         let cvConts = List.fold folder Set[] cases
         Set.union (capturedVars expr) cvConts
+    | Array(length, data) ->
+        Set.union (capturedVars length) (capturedVars data)
+    | ArrayLength(arr) ->
+        capturedVars arr
+    | ArrayElem(arr, index) ->
+        Set.union (capturedVars arr) (capturedVars index)
 
 /// Compute the union of the captured variables in a list of AST nodes.
 and internal capturedVarsInList (nodes: List<Node<'E,'T>>): Set<string> =

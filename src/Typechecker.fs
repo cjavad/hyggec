@@ -127,6 +127,14 @@ let rec internal resolvePretype (env: TypingEnv) (pt: AST.PretypeNode): Result<T
                 /// Type of each union case
                 let caseTypes = List.map getOkValue caseTypes
                 Ok(TUnion(List.zip caseLabels caseTypes))
+    | Pretype.TArray(elemPretype) ->
+        let returnType = resolvePretype env elemPretype
+        let error = collectErrors [returnType]
+        if not error.IsEmpty then Error(error)
+        else
+            let returnType = getOkValue returnType
+            Ok(TArray(returnType))
+        
 
 /// Resolve a type variable using the given typing environment: optionally
 /// return the Type corresponding to variable 'name', or None if 'name' is not
@@ -667,6 +675,12 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
             Ok { Pos = node.Pos; Env = env; Type = TUnion([label, texpr.Type]);
                  Expr = UnionCons(label, texpr) }
         | Error(es) -> Error(es)
+    | Array(length, data) ->
+        match (typer env length, typer env data) with
+        | (Ok(tlength), Ok(tdata)) when isSubtypeOf env tlength.Type TInt ->
+            Ok { Pos = node.Pos; Env = env; Type = TArray(tdata.Type)
+                 Expr =  Array(tlength, tdata)}
+        |
 
     | Match(expr, cases) ->
         /// Duplicate labels in the pattern matching cases

@@ -30,6 +30,8 @@ type Type =
     | TStruct of fields: List<string * Type>
     /// Discriminated union type.  Each case consists of a label and a type.
     | TUnion of cases: List<string * Type>
+    /// An array type with elements
+    | TArray of elements: Type
 
     /// Returns a human-readable string describing the type.
     override this.ToString(): string =
@@ -52,6 +54,7 @@ type Type =
             let fmtCase (f: string, t: Type) = $"%s{f}: %O{t}"
             let casesStr = Seq.map fmtCase cases
             "union {" + System.String.Join("; ", casesStr) + "}"
+        | TArray(elements) -> $"array %O{elements}"
 
 /// List of basic types known by the compiler.  NOTE: this list must be kept in
 /// sync with the definition of 'Type'.
