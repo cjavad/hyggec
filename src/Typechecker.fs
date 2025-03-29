@@ -680,7 +680,30 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
         | (Ok(tlength), Ok(tdata)) when isSubtypeOf env tlength.Type TInt ->
             Ok { Pos = node.Pos; Env = env; Type = TArray(tdata.Type)
                  Expr =  Array(tlength, tdata)}
-        |
+        | (Ok(tsize), _) ->
+            Error([node.Pos, $"Array size: expected type of $O{TInt}, but found $O{tsize.Type}"])
+        | (Error(es), _) | (_, Error(es)) -> Error(es)
+    | ArrayLength(arr) ->
+        match (typer env arr) with
+        | Ok(tarr) ->
+            match expandType env tarr.Type with
+            | TArray(_) ->
+                Ok {Pos = node.Pos; Env = env; Type = TInt
+                    Expr = ArrayLength(tarr)}
+            | t ->
+                Error([node.Pos, $"Array length: expected type of array but found $O{t}"])
+        | Error(es) -> Error(es)
+    | ArrayElem(arr, index) ->
+        match (typer env arr, typer env index) with
+        | (Ok(tarr), Ok(tidx)) ->
+            match expandType env tarr.Type with
+            | TArray(elemType) when isSubtypeOf env tidx.Type TInt ->
+                Ok {Pos = node.Pos; Env = env; Type = elemType; Expr = ArrayElem(tarr, tidx)}
+            | TArray(_) ->
+                Error([node.Pos, $"Array index: expected type of $O{TInt} but found $O{tidx.Type}"])
+            | t ->
+                Error([node.Pos, $"Array element: expected type of array but found $O{t}"])
+        | (Error(es), _) | (_, Error(es)) -> Error(es)
 
     | Match(expr, cases) ->
         /// Duplicate labels in the pattern matching cases

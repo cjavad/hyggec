@@ -50,6 +50,11 @@ type internal Heap<'E, 'T> = Map<uint, Node<'E, 'T>>
 /// Runtime environment for the interpreter.  The type parameters have the same
 /// meaning of the corresponding ones in AST.Node<'E,'T>: they allow the
 /// environment to hold generic instances of AST.Node<'E,'T>.
+
+type internal hInfo = 
+    | StructFields of string list
+    | ArrayLength of uint
+
 type internal RuntimeEnv<'E, 'T> =
     {
         /// Function called to read a line when evaluating 'ReadInt' and 'ReadFloat'
@@ -64,7 +69,7 @@ type internal RuntimeEnv<'E, 'T> =
         Heap: Heap<'E, 'T>
         /// Pointer information, mapping memory addresses to lists of structure
         /// fields.
-        PtrInfo: Map<uint, List<string>>
+        PtrInfo: Map<uint, hInfo>
     }
 
     override this.ToString() : string =

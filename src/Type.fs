@@ -78,6 +78,7 @@ let rec freeTypeVars (t: Type): Set<string> =
     | TUnion(cases) ->
         let (_, caseTypes) = List.unzip cases
         collectFreeTypeVars caseTypes
+    | TArray(elements) -> freeTypeVars elements
 
 /// Collect all free type variables in the given list of types.
 and collectFreeTypeVars (ts: List<Type>): Set<string> =

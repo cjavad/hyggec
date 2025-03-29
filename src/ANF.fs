@@ -320,6 +320,7 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
     
     | Postinc(arg) -> failwith"Implement increment"
     | Preinc(arg) -> failwith"Implement increment"
+    | Array(arg) -> failwith="Implement array"
     
     | If(condition, ifTrue, ifFalse) ->
         /// Condition in ANF and related definitions
