@@ -182,6 +182,11 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
             else (lab, v, (substVar cont var var2))
         let cases2 = List.map substCase cases
         {node with Expr = Match((substVar expr var var2), cases2)}
+    
+    | ArrayElem(target, index) -> failwith "Not done"
+    | ArrayLength(target) -> failwith "Not done"
+    | Array(length, data) -> failwith "Not done"
+    
 
 
 /// Convert a given AST node (expected to contain a variable) and a list of ANF
@@ -320,7 +325,9 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
     
     | Postinc(arg) -> failwith"Implement increment"
     | Preinc(arg) -> failwith"Implement increment"
-    | Array(arg) -> failwith="Implement array"
+    | Array(length, data) -> failwith"Implement array"
+    | ArrayElem(target, index) -> failwith"Implement array"
+    | ArrayLength(target) -> failwith"Implement array"
     
     | If(condition, ifTrue, ifFalse) ->
         /// Condition in ANF and related definitions

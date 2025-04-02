@@ -281,7 +281,7 @@ pretype:
   | UNION LCURLY unionLabelTypeSeq RCURLY    { mkPretypeNode(parseState, 1,
                                                              Pretype.TUnion($3)) }
   | ARRAY LCURLY pretype RCURLY              { mkPretypeNode(parseState, 1,
-                                                             PreType.TArray($3)) }
+                                                             Pretype.TArray($3)) }
 
 // Generic identifier
 ident:

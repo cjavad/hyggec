@@ -685,13 +685,9 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
         | (Error(es), _) | (_, Error(es)) -> Error(es)
     | ArrayLength(arr) ->
         match (typer env arr) with
-        | Ok(tarr) ->
-            match expandType env tarr.Type with
-            | TArray(_) ->
-                Ok {Pos = node.Pos; Env = env; Type = TInt
-                    Expr = ArrayLength(tarr)}
-            | t ->
-                Error([node.Pos, $"Array length: expected type of array but found $O{t}"])
+        | Ok(tarr) when isSubtypeOf env tarr.Type (TArray(TUnit)) ->
+            Ok { Pos = node.Pos; Env = env; Type = TInt; Expr = ArrayLength(tarr) }
+        | Ok(tarr) -> Error([(node.Pos, $"arrayLength expected type, but got {tarr.Type}")])
         | Error(es) -> Error(es)
     | ArrayElem(arr, index) ->
         match (typer env arr, typer env index) with

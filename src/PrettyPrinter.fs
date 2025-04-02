@@ -70,6 +70,8 @@ let rec internal formatType (t: Type.Type): Tree =
         let casesChildren =
             List.map (fun (f, t) -> ($"label %s{f}", formatType t)) cases
         Node("union", casesChildren)
+    | Type.TArray(elements) ->
+        Node("array", [("elements", formatType elements)])
 
 
 /// Traverse a Hygge typing environment and return its hierarchical
@@ -242,6 +244,14 @@ let rec internal formatASTRec (node: AST.Node<'E,'T>): Tree =
             List.map (fun (l, v, cont) -> ($"case %s{l}{{%s{v}}}",
                                            formatASTRec cont)) cases
         mkTree "Match" node (("expr", formatASTRec expr) :: casesChildren)
+    | Array(length, data) ->
+        mkTree $"Array" node [("length", formatASTRec length)
+                              ("data", formatASTRec data)]
+    | ArrayElem(arr, index) ->
+        mkTree $"ArrayElem" node [("arr", formatASTRec arr)
+                                  ("index", formatASTRec index)]
+    | ArrayLength(arr) ->
+        mkTree $"ArrayLength" node [("arr", formatASTRec arr)]
 
 /// Return a description of an AST node, and possibly some subtrees (that are
 /// added to the overall tree structure).
@@ -294,6 +304,8 @@ and internal formatPretypeNode (node: PretypeNode): Tree =
             List.map (fun (name, t) -> ((formatPretypeDescr t $"label %s{name}"),
                                         formatPretypeNode t)) cases
         Node((formatPretypeDescr node "Union pretype"), casesChildren)
+    | Pretype.TArray(elements) ->
+        Node((formatPretypeDescr node "Array pretype"), ["Element type", formatPretypeNode elements])
 
 /// Format the description of a pretype AST node (without printing its
 /// children).
