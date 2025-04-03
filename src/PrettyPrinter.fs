@@ -185,6 +185,10 @@ let rec internal formatASTRec (node: AST.Node<'E, 'T>) : Tree =
             List.map (fun (i, n) -> ($"arg %d{i + 1}", formatASTRec n)) (List.indexed args)
 
         mkTree (syscallFormatName Platform.RARS num) node argChildren
+    | Preinc(arg) ->
+        mkTree "Preinc" node [("arg", formatASTRec arg)]
+    | Postinc(arg) ->
+        mkTree "Postinc" node [("arg", formatASTRec arg)]
     | If(condition, ifTrue, ifFalse) ->
         mkTree
             "Conditional"

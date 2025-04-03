@@ -196,6 +196,14 @@ and Expr<'E, 'T> =
     /// Any syscall with a list of arguments.
     | Syscall of number: int * args: List<Node<'E, 'T>>
 
+    | PrintLn of arg: Node<'E,'T>
+    
+    // Post-increment
+    | Preinc of arg: Node<'E, 'T>
+    
+    // Post-increment
+    | Postinc of arg: Node<'E, 'T>
+    
     /// Conditional expression (if ... then ... else ...).
     | If of condition: Node<'E, 'T> * ifTrue: Node<'E, 'T> * ifFalse: Node<'E, 'T>
 

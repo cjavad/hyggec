@@ -99,7 +99,9 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
 
     | ReadInt
     | ReadFloat -> node // The substitution has no effect
-
+    // add later
+    | Postinc(arg) -> failwith"Implement increment"
+    | Preinc(arg) -> failwith"Implement increment"
     | Print(arg) ->
         {node with Expr = Print(substVar arg var var2)}
     | PrintLn(arg) ->
@@ -324,7 +326,10 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
         /// Definition binding this expression in ANF to its variable
         let anfDef = ANFDef(false, {node with Expr = Ascription(tpe, argANF)})
         ({node with Expr = Var(anfDef.Var)}, anfDef :: argDefs)
-
+    
+    | Postinc(arg) -> failwith"Implement increment"
+    | Preinc(arg) -> failwith"Implement increment"
+    
     | If(condition, ifTrue, ifFalse) ->
         /// Condition in ANF and related definitions
         let (condANF, condDefs) = toANFDefs condition

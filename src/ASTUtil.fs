@@ -83,6 +83,13 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = PrintLn(subst arg var sub)}
     | Syscall(num, args) ->
         {node with Expr = Syscall(num, List.map (fun n -> (subst n var sub)) args)}
+    
+    | Preinc(arg) ->
+        {node with Expr = Preinc(subst arg var sub)}
+    
+    | Postinc(arg) ->
+        {node with Expr = Postinc(subst arg var sub)}
+    
     | If(cond, ifTrue, ifFalse) ->
         {node with Expr = If((subst cond var sub), (subst ifTrue var sub),
                                                    (subst ifFalse var sub))}
@@ -206,6 +213,8 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
     | ReadFloat -> Set[]
     | Print(arg)
     | PrintLn(arg) -> freeVars arg
+    | Preinc(arg) -> freeVars arg
+    | Postinc(arg) -> freeVars arg
     | If(condition, ifTrue, ifFalse) ->
         Set.union (freeVars condition)
                   (Set.union (freeVars ifTrue) (freeVars ifFalse))
@@ -304,6 +313,8 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
     | ReadFloat -> Set[]
     | Print(arg)
     | PrintLn(arg) -> capturedVars arg
+    | Preinc(arg) -> capturedVars arg
+    | Postinc(arg) -> capturedVars arg
     | If(condition, ifTrue, ifFalse) ->
         Set.union (capturedVars condition)
                   (Set.union (capturedVars ifTrue) (capturedVars ifFalse))

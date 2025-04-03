@@ -489,6 +489,28 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
                   Type = t
                   Expr = Syscall(a, targ) }
         | Error(es) -> Error(es)
+    
+    | Preinc(arg) ->
+        match (typer env arg) with
+        | Ok(targ) when (isSubtypeOf env targ.Type TInt) ->
+            Ok {Pos = node.Pos; Env = env; Type = TInt; Expr = Preinc(targ)}
+        | Ok(targ) when (isSubtypeOf env targ.Type TFloat) ->
+            Ok {Pos = node.Pos; Env = env; Type = TFloat; Expr = Preinc(targ)}
+        | Ok(targ) ->
+            Error([(node.Pos, $"Increment: expected type %O{TInt}, "
+                              + $"found %O{targ.Type}")])
+        | Error(es) -> Error(es)
+        
+    | Postinc(arg) ->
+        match (typer env arg) with
+        | Ok(targ) when (isSubtypeOf env targ.Type TInt) ->
+            Ok {Pos = node.Pos; Env = env; Type = TInt; Expr = Postinc(targ)}
+        | Ok(targ) when (isSubtypeOf env targ.Type TFloat) ->
+            Ok {Pos = node.Pos; Env = env; Type = TFloat; Expr = Postinc(targ)}
+        | Ok(targ) ->
+            Error([(node.Pos, $"Increment: expected type %O{TInt}, "
+                              + $"found %O{targ.Type}")])
+        | Error(es) -> Error(es) 
 
     | If(cond, ifT, ifF) ->
         match (typer env cond) with
