@@ -53,7 +53,7 @@ type internal Heap<'E, 'T> = Map<uint, Node<'E, 'T>>
 
 type internal hInfo = 
     | StructFields of string list
-    | ArrayLength of uint
+    | Arraylen of uint
 
 type internal RuntimeEnv<'E, 'T> =
     {
@@ -89,7 +89,7 @@ type internal RuntimeEnv<'E, 'T> =
             match choice with
             | StructFields fields ->
                 str + $"      0x%x{addr}: [%s{printFields fields}]%s{Util.nl}"
-            | ArrayLength length ->
+            | Arraylen length ->
                 str + $"      0x%x{addr}: [array of length %d{length}%s{Util.nl}"
 
         let ptrInfoStr =
@@ -557,12 +557,12 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             Some(env'', { node with Expr = Array(size', init') })
         | (None, None) when isValue size && isValue init ->
             match size.Expr with
-            | IntVal(n) when uint n >= 0 ->
+            | IntVal(n) when n >= 0 ->
                 let elements = List.replicate n init
                 let (heap', baseAddr) = heapAlloc env.Heap elements
                 let env' = {env with
                                 Heap = heap'
-                                PtrInfo = env.PtrInfo.Add(baseAddr, ArrayLength (uint n))}
+                                PtrInfo = env.PtrInfo.Add(baseAddr, Arraylen (uint n))}
                 Some (env', { node with Expr = Pointer(baseAddr) })
             | IntVal(n) ->
                 failwith $"Runtime error: Array is of negative size {n}"
@@ -572,7 +572,7 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
     | ArrayElem(arr, index) ->
         match (reduce env arr, reduce env index) with
         | (Some(env', arr'), None) ->
-        Some(env', { node with Expr = ArrayElem(arr', index) })
+            Some(env', { node with Expr = ArrayElem(arr', index) })
         | (None, Some(env', index')) ->
             Some(env', { node with Expr = ArrayElem(arr, index') })
         | (Some(env', arr'), Some(env'', index')) ->
@@ -581,11 +581,11 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             match (arr.Expr, index.Expr) with
             | (Pointer(addr), IntVal(i)) when i >= 0 ->
                 match env.PtrInfo.TryFind addr with
-                | Some(ArrayLength length) when uint i < length ->
+                | Some(Arraylen length) when uint i < length ->
                     match env.Heap.TryFind (addr + uint i) with
                     | Some(value) -> Some(env, value)
                     | None -> failwith $"Runtime error: CORRUPTED"
-                | Some(ArrayLength length) ->
+                | Some(Arraylen length) ->
                     failwith$"Runtime error: Array index {i} out of bounds. Length: {length}"
                 | Some(StructFields _) ->
                     failwith"Runtime error: StructFields error"
@@ -606,7 +606,7 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             match arr.Expr with
             | Pointer(addr) ->
                 match env.PtrInfo.TryFind addr with
-                | Some(ArrayLength length) ->
+                | Some(Arraylen length) ->
                     Some(env, { node with Expr = IntVal(int length) })
                 | Some(StructFields _) ->
                     failwith$"errror"
@@ -650,7 +650,7 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
 
                 Some(env', value)
             | None -> None
-        | Some(ArrayLength,_) -> failwith$"Runtime error: Field access on array: 0x%x{addr}"
+        | Some(Arraylen _) -> failwith$"Runtime error: Field access on array: 0x%x{addr}"
         | None -> None
     | Assign(target, expr) when not (isValue expr) ->
         match (reduce env expr) with
@@ -670,6 +670,25 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
 
             Some(env', { node with Expr = expr.Expr })
         | None -> None
+    | Assign({ Expr = ArrayElem(arr,index) } as target, expr) when not (isValue arr) || not (isValue index) ->
+        match (reduce env arr, reduce env index) with
+        | (Some(env', arr'), None) ->
+            let target' =
+                { target with
+                    Expr = ArrayElem(arr', index) }
+            Some(env', { node with Expr = Assign(target', expr) })
+        | (None, Some(env', index')) ->
+            let target' =
+                { target with
+                    Expr = ArrayElem(arr, index') }
+            Some(env', { node with Expr = Assign(target', expr) })
+        | (Some(env', arr'), Some(env'', index')) ->
+            let target' =
+                { target with
+                    Expr = ArrayElem(arr', index') }
+            Some(env'', { node with Expr = Assign(target', expr) })
+        | _ -> None
+    
     | Assign(_, _) -> None
 
     | While(cond, body) ->
@@ -755,7 +774,7 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             match (List.tryFindIndex (fun f -> f = field) fields) with
             | Some(offset) -> Some(env, env.Heap[addr + (uint offset)])
             | None -> None
-        | Some(ArrayLength,_) -> failwith$"Runtime error: Field access on array: 0x%x{addr}"
+        | Some(Arraylen _) -> failwith$"Runtime error: Field access on array: 0x%x{addr}"
         | None -> None
     | FieldSelect(target, field) when not (isValue target) ->
         match (reduce env target) with
