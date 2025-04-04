@@ -1,0 +1,5 @@
+let arr: array {int} = array(4, 40 + 2);
+arrayElem(arr, 1) <- 420;
+assert(arrayElem(arr, 1) = 420);
+assert(arrayElem(arr, 0) = 42);
+assert(arrayLength(arr) = 4)

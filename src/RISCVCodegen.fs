@@ -685,6 +685,30 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                 selTargetCode ++ rhsCode ++ assignCode
             | t ->
                 failwith $"BUG: field selection on invalid object type: %O{t}"
+        | ArrayElem(target, index) ->
+            let targetCode = doCodegen env target
+            let indexCode = doCodegen { env with Target = env.Target + 1u } index
+            let rhsCode = doCodegen { env with Target = env.Target + 2u } rhs
+            
+            match target.Type with
+            | TArray(elementType) ->
+                let addrCode =
+                    Asm([
+                        (RV.LI(Reg.r(env.Target + 3u), 4), "Load constant 4")
+                        (RV.MUL(Reg.r(env.Target + 1u), Reg.r(env.Target + 1u), Reg.r(env.Target + 3u)),
+                         "Multiply index by 4")
+                        (RV.ADDI(Reg.r(env.Target + 1u), Reg.r(env.Target + 1u), Imm12(4)), "Skip length")
+                        (RV.ADD(Reg.r(env.Target), Reg.r(env.Target), Reg.r(env.Target + 1u)),
+                         "Offset to base addr")
+                    ])
+                let storingCode =
+                    match elementType with
+                    | TInt ->
+                        Asm(RV.SW(Reg.r(env.Target + 2u), Imm12(0), Reg.r(env.Target)),
+                            "Store the array element")
+                    | _ -> failwithf$"Not right now"
+                targetCode ++ indexCode ++ rhsCode ++ addrCode ++ storingCode
+            | _ -> failwithf"Bugged"
         | _ ->
             failwith ($"BUG: assignment to invalid target:%s{Util.nl}"
                       + $"%s{PrettyPrinter.prettyPrint lhs}")
@@ -905,6 +929,67 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
 
     | UnionCons(label, expr) -> failwith "todo"
     | Match(expr, cases) -> failwith "todo"
+    | Array(size, init) ->
+        let sizeCode = doCodegen env size
+        match size.Type with
+        | TInt ->
+            match size.Expr with
+            | IntVal(n) when n >= 0 ->
+                let allocationCode =
+                    (beforeSysCall [Reg.a0] [])
+                        .AddText([
+                            (RV.LI(Reg.a0, n*4 + 4), "Memory to allocate for array")
+                            (RV.LI(Reg.a7, 9), "Sbrk")
+                            (RV.ECALL, "ECALL")
+                            (RV.MV(Reg.r(env.Target), Reg.a0), "Array base adr to target")
+                            (RV.LI(Reg.r(env.Target + 1u), n), "Load length")
+                            (RV.SW(Reg.r(env.Target + 1u), Imm12(0), Reg.r(env.Target)), "Store length")
+                        ])
+                        ++ (afterSysCall [Reg.a0] [])
+                let initCode = doCodegen { env with Target = env.Target + 1u } init
+                
+                let storingCode =
+                    let folder (acc: Asm) (i: int) =
+                        match init.Type with
+                        | t when isSubtypeOf init.Env t TInt ->
+                            acc.AddText(RV.SW(Reg.r(env.Target + 1u), Imm12((i + 1) * 4), Reg.r(env.Target)))
+                        | _ -> failwithf$"Not supported right now"
+                    List.fold folder (Asm()) [0 .. n-1]
+                    
+                sizeCode ++ allocationCode ++ initCode ++ storingCode
+            | _ -> failwithf$"Not supported right now"
+        | t -> failwithf$"Bugged"
+    | ArrayElem(target, index) ->
+        let targetCode = doCodegen env target
+        let indexCode = doCodegen { env with Target = env.Target + 1u } index
+        
+        match target.Type with
+        | TArray(elementType) ->
+            let addrCode =
+                Asm([
+                    (RV.LI(Reg.r(env.Target + 2u), 4), "Load constant 4")
+                    (RV.MUL(Reg.r(env.Target + 1u), Reg.r(env.Target + 1u), Reg.r(env.Target + 2u)),
+                     "Multiply index by 4")
+                    (RV.ADDI(Reg.r(env.Target + 1u), Reg.r(env.Target + 1u), Imm12(4)), "Skip length")
+                    (RV.ADD(Reg.r(env.Target), Reg.r(env.Target), Reg.r(env.Target + 1u)),
+                     "Offset to base addr")
+                ])
+            let loadCode =
+                match elementType with
+                | TInt ->
+                    Asm(RV.LW(Reg.r(env.Target), Imm12(0), Reg.r(env.Target)),
+                        "Load array element")
+                | _ ->
+                    failwithf$"Will implement later"
+            targetCode ++ indexCode ++ addrCode ++ loadCode
+        | t -> failwithf"Bugged"
+    | ArrayLength(target) ->
+        let targetCode = doCodegen env target
+        match target.Type with
+        | TArray(_) ->
+            targetCode.AddText(RV.LW(Reg.r(env.Target), Imm12(0), Reg.r(env.Target)),
+                               "Array length from base addr")
+        | t -> failwithf$"Bugged"
 
 /// Generate code to save the given registers on the stack, before a RARS system
 /// call. Register a7 (which holds the system call number) is backed-up by

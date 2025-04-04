@@ -541,6 +541,9 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
             | FieldSelect(_, _) ->
                 Ok { Pos = node.Pos; Env = env; Type = ttarget.Type;
                      Expr = Assign(ttarget, texpr) }
+            | ArrayElem(_, _) ->
+                Ok { Pos = node.Pos; Env = env; Type = ttarget.Type;
+                     Expr = Assign(ttarget, texpr) }
             | _ -> Error([(node.Pos, "invalid assignment target")])
         | (Ok(ttarget), Ok(texpr)) ->
             Error([(texpr.Pos,
@@ -685,9 +688,9 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
         | (Error(es), _) | (_, Error(es)) -> Error(es)
     | ArrayLength(arr) ->
         match (typer env arr) with
-        | Ok(tarr) when isSubtypeOf env tarr.Type (TArray(TUnit)) ->
+        | Ok(tarr) when isSubtypeOf env tarr.Type (TArray(TInt)) ->
             Ok { Pos = node.Pos; Env = env; Type = TInt; Expr = ArrayLength(tarr) }
-        | Ok(tarr) -> Error([(node.Pos, $"arrayLength expected type, but got {tarr.Type}")])
+        | Ok(tarr) -> Error([(node.Pos, $"arrayLength expected array type, but got {tarr.Type}")])
         | Error(es) -> Error(es)
     | ArrayElem(arr, index) ->
         match (typer env arr, typer env index) with

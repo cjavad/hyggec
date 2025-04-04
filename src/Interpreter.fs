@@ -688,6 +688,26 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
                     Expr = ArrayElem(arr', index') }
             Some(env'', { node with Expr = Assign(target', expr) })
         | _ -> None
+    | Assign({ Expr = ArrayElem(arr, index) }, expr) when not (isValue expr) ->
+        match (reduce env expr) with
+        | Some(env', expr') ->
+            Some(env', { node with Expr = Assign({ node with Expr = ArrayElem(arr, index) }, expr') })
+        | None -> None
+    | Assign({ Expr = ArrayElem(arr, index) }, expr) when isValue arr && isValue index && isValue expr ->
+        match (arr.Expr, index.Expr) with
+        | (Pointer(addr), IntVal(i)) when i >= 0 ->
+            match env.PtrInfo.TryFind addr with
+            | Some(Arraylen len) when uint i < len ->
+                let env' = { env with Heap = env.Heap.Add(addr + uint i, expr) }
+                Some(env', expr)
+            | Some(Arraylen _) ->
+                failwithf$"Error"
+            | Some(StructFields _) ->
+                failwithf$"Error"
+            | _ ->
+                failwithf"Error"
+        | _ ->
+            failwithf"Better error messages can be made here"
     
     | Assign(_, _) -> None
 
