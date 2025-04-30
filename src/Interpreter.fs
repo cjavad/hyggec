@@ -564,10 +564,7 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
                                 Heap = heap'
                                 PtrInfo = env.PtrInfo.Add(baseAddr, Arraylen (uint n))}
                 Some (env', { node with Expr = Pointer(baseAddr) })
-            | IntVal(n) ->
-                failwith $"Runtime error: Array is of negative size {n}"
-            | _ ->
-                failwith $"Runtime error: Array size must be integer"
+            | _ -> None
         | _ -> None
     | ArrayElem(arr, index) ->
         match (reduce env arr, reduce env index) with
@@ -584,19 +581,9 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
                 | Some(Arraylen length) when uint i < length ->
                     match env.Heap.TryFind (addr + uint i) with
                     | Some(value) -> Some(env, value)
-                    | None -> failwith $"Runtime error: CORRUPTED"
-                | Some(Arraylen length) ->
-                    failwith$"Runtime error: Array index {i} out of bounds. Length: {length}"
-                | Some(StructFields _) ->
-                    failwith"Runtime error: StructFields error"
-                | None ->
-                    failwith$"Runtime error: Array pointer error 0x%x{addr}"
-            | (Pointer(_), IntVal(i)) ->
-                failwith $"Runtime error: Array has negative index {i}"
-            | (Pointer(_), _) ->
-                failwith $"Runtime error: Array size must be integer"
-            | _ ->
-                failwith$"Runtime error: Expecting array"
+                    | _ -> None
+                | _ -> None
+            | _ -> None
         | _ -> None
     | ArrayLength(arr) ->
         match (reduce env arr) with
@@ -608,12 +595,8 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
                 match env.PtrInfo.TryFind addr with
                 | Some(Arraylen length) ->
                     Some(env, { node with Expr = IntVal(int length) })
-                | Some(StructFields _) ->
-                    failwith$"errror"
-                | None ->
-                    failwith$"errororo"
-            | _ ->
-                failwith$"errooror"
+                | _ -> None
+            | _ -> None
         | _ -> None
     
     | Assign({ Expr = FieldSelect(selTarget, field) } as target, expr) when not (isValue selTarget) ->
@@ -700,14 +683,8 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             | Some(Arraylen len) when uint i < len ->
                 let env' = { env with Heap = env.Heap.Add(addr + uint i, expr) }
                 Some(env', expr)
-            | Some(Arraylen _) ->
-                failwithf$"Error"
-            | Some(StructFields _) ->
-                failwithf$"Error"
-            | _ ->
-                failwithf"Error"
-        | _ ->
-            failwithf"Better error messages can be made here"
+            | _ -> None
+        | _ -> None
     
     | Assign(_, _) -> None
 
