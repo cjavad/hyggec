@@ -77,9 +77,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
     | Var(name) ->
         // To compile a variable, we inspect its type and where it is stored
         match node.Type with
-        | t when (isSubtypeOf node.Env t TUnit)
+        | t when (isSubtypeOf node.Env Set.empty t TUnit)
             -> Asm() // A unit-typed variable is just ignored
-        | t when (isSubtypeOf node.Env t TFloat) ->
+        | t when (isSubtypeOf node.Env Set.empty t TFloat) ->
             match (env.VarStorage.TryFind name) with
             | Some(Storage.FPReg(fpreg)) ->
                 Asm(RV.FMV_S(FPReg.r(env.FPTarget), fpreg),
@@ -126,7 +126,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         let lAsm = doCodegen env lhs
         // The generated code depends on the type of addition being computed
         match node.Type with
-        | t when (isSubtypeOf node.Env t TInt) ->
+        | t when (isSubtypeOf node.Env Set.empty t TInt) ->
             /// Target register for the rhs expression
             let rtarget = env.Target + 1u
             /// Generated code for the rhs expression
@@ -152,7 +152,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                     | x -> failwith $"BUG: unexpected operation %O{x}"
             // Put everything together
             lAsm ++ rAsm ++ opAsm
-        | t when (isSubtypeOf node.Env t TFloat) ->
+        | t when (isSubtypeOf node.Env Set.empty t TFloat) ->
             /// Target register for the rhs expression
             let rfptarget = env.FPTarget + 1u
             /// Generated code for the rhs expression
@@ -216,7 +216,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
     | Sqrt(arg) ->
         let asm = doCodegen env arg
         match (arg.Type) with
-            | t when (isSubtypeOf arg.Env t TFloat) -> 
+            | t when (isSubtypeOf arg.Env Set.empty t TFloat) -> 
                 asm.AddText(RV.FSQRT_S(FPReg.r(env.FPTarget),
                                        FPReg.r(env.FPTarget)))
             | t -> failwith $"BUG: unexpected operation %O{t}"
@@ -273,7 +273,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         let lAsm = doCodegen env lhs
         // The generated code depends on the lhs and rhs types
         match lhs.Type with
-        | t when (isSubtypeOf lhs.Env t TInt) ->
+        | t when (isSubtypeOf lhs.Env Set.empty t TInt) ->
             // Our goal is to write 1 (true) or 0 (false) in the register
             // env.Target, depending on the result of the comparison between
             // the lhs and rhs.  To achieve this, we perform a conditional
@@ -321,7 +321,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                     (RV.LI(Reg.r(env.Target), 1), "Comparison result is true")
                     (RV.LABEL(endLabel), "")
                 ])
-        | t when (isSubtypeOf lhs.Env t TFloat) ->
+        | t when (isSubtypeOf lhs.Env Set.empty t TFloat) ->
             /// Target register for the rhs expression
             let rfptarget = env.FPTarget + 1u
             /// Generated code for the rhs expression
@@ -369,7 +369,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         let argCode = doCodegen env arg
         // The generated code depends on the 'print' argument type
         match arg.Type with
-        | t when (isSubtypeOf arg.Env t TBool) ->
+        | t when (isSubtypeOf arg.Env Set.empty t TBool) ->
             let strTrue = Util.genSymbol "true"
             let strFalse = Util.genSymbol "false"
             let printFalse = Util.genSymbol "print_true"
@@ -388,7 +388,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                     (RV.ECALL, "")
                   ])
                   ++ (afterSysCall [Reg.a0] [])
-        | t when (isSubtypeOf arg.Env t TInt) ->
+        | t when (isSubtypeOf arg.Env Set.empty t TInt) ->
             argCode
             ++ (beforeSysCall [Reg.a0] [])
                 .AddText([
@@ -397,7 +397,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                     (RV.ECALL, "")
                 ])
                 ++ (afterSysCall [Reg.a0] [])
-        | t when (isSubtypeOf arg.Env t TFloat) ->
+        | t when (isSubtypeOf arg.Env Set.empty t TFloat) ->
             argCode
             ++ (beforeSysCall [] [FPReg.fa0])
                 .AddText([
@@ -406,7 +406,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                     (RV.ECALL, "")
                 ])
                 ++ (afterSysCall [] [FPReg.fa0])
-        | t when (isSubtypeOf arg.Env t TString) ->
+        | t when (isSubtypeOf arg.Env Set.empty t TString) ->
             argCode
             ++ (beforeSysCall [Reg.a0] [])
                 .AddText([
@@ -434,11 +434,11 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             match env.VarStorage.TryFind name with
             | Some(_) ->
                 match (expandType arg.Env arg.Type) with
-                | t when (isSubtypeOf arg.Env t TInt) ->
+                | t when (isSubtypeOf arg.Env Set.empty t TInt) ->
                     let addNode = { node with Expr = Add(arg, { node with Expr = IntVal(1) }) }
                     let assignNode = { node with Expr = Assign(arg, addNode) }
                     doCodegen env assignNode
-                | t when (isSubtypeOf arg.Env t TFloat) ->
+                | t when (isSubtypeOf arg.Env Set.empty t TFloat) ->
                     let addNode = { node with Expr = Add(arg, { node with Expr = FloatVal(1.0f) }) }
                     let assignNode = { node with Expr = Assign(arg, addNode) }
                     doCodegen env assignNode
@@ -451,7 +451,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             match env.VarStorage.TryFind name with
             | Some(_) ->
                 match (expandType arg.Env arg.Type) with
-                | t when (isSubtypeOf arg.Env t TInt) ->
+                | t when (isSubtypeOf arg.Env Set.empty t TInt) ->
                     // x++ is more interesting than ++x
                     // First, we load the original value to env.Target
                     let origCode = doCodegen env arg
@@ -467,7 +467,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                     // The next code sequence sets env.Target + 1u to x + 1 and assigns it back to x
                     // The result is that the original value is returned and x is updated
                     origCode ++ assignCode
-                | t when (isSubtypeOf arg.Env t TFloat) ->
+                | t when (isSubtypeOf arg.Env Set.empty t TFloat) ->
                     // Same as the one above but floaty :D
                     let origCode = doCodegen env arg
                     let addNode = { node with Expr = Add(arg, { node with Expr = FloatVal(1.0f) }) }
@@ -588,12 +588,12 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         /// execution)
         let initCode = doCodegen env init
         match init.Type with
-        | t when (isSubtypeOf init.Env t TUnit) ->
+        | t when (isSubtypeOf init.Env Set.empty t TUnit) ->
             // The 'init' produces a unit value, i.e. nothing: we can keep using
             // the same target registers, and we don't need to update the
             // variables-to-registers mapping.
             initCode ++ (doCodegen env scope)
-        | t when (isSubtypeOf init.Env t TFloat) ->
+        | t when (isSubtypeOf init.Env Set.empty t TFloat) ->
             /// Target register for compiling the 'let' scope
             let scopeTarget = env.FPTarget + 1u
             /// Variable storage for compiling the 'let' scope
@@ -627,7 +627,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             /// Code for the 'rhs', leaving its result in the target register
             let rhsCode = doCodegen env rhs
             match rhs.Type with
-            | t when (isSubtypeOf rhs.Env t TUnit) ->
+            | t when (isSubtypeOf rhs.Env Set.empty t TUnit) ->
                 rhsCode // No assignment to perform
             | _ ->
                 match (env.VarStorage.TryFind name) with
@@ -639,7 +639,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                                     $"Assignment to variable %s{name}")
                 | Some(Storage.Label(lab)) ->
                     match rhs.Type with
-                    | t when (isSubtypeOf rhs.Env t TFloat) ->
+                    | t when (isSubtypeOf rhs.Env Set.empty t TFloat) ->
                         rhsCode.AddText([ (RV.LA(Reg.r(env.Target), lab),
                                            $"Load address of variable '%s{name}'")
                                           (RV.FSW_S(FPReg.r(env.FPTarget), Imm12(0),
@@ -669,9 +669,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                 /// Assembly code that performs the field value assignment
                 let assignCode =
                     match rhs.Type with
-                    | t when (isSubtypeOf rhs.Env t TUnit) ->
+                    | t when (isSubtypeOf rhs.Env Set.empty t TUnit) ->
                         Asm() // Nothing to do
-                    | t when (isSubtypeOf rhs.Env t TFloat) ->
+                    | t when (isSubtypeOf rhs.Env Set.empty t TFloat) ->
                         Asm(RV.FSW_S(FPReg.r(env.FPTarget), Imm12(offset * 4),
                                      Reg.r(env.Target)),
                             $"Assigning value to struct field '%s{field}'")
@@ -854,9 +854,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             /// (multiplied by 4, i.e. the word size) to the base struct address
             let fieldInitCode: Asm =
                 match fieldInit.Type with
-                | t when (isSubtypeOf fieldInit.Env t TUnit) ->
+                | t when (isSubtypeOf fieldInit.Env Set.empty t TUnit) ->
                     Asm() // Nothing to do
-                | t when (isSubtypeOf fieldInit.Env t TFloat) ->
+                | t when (isSubtypeOf fieldInit.Env Set.empty t TFloat) ->
                     Asm(RV.FSW_S(FPReg.r(env.FPTarget), Imm12(fieldOffset * 4),
                                  Reg.r(env.Target)),
                         $"Initialize struct field '%s{fieldNames.[fieldOffset]}'")
@@ -908,9 +908,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                 let (fieldNames, fieldTypes) = List.unzip fields
                 let offset = List.findIndex (fun f -> f = field) fieldNames
                 match fieldTypes.[offset] with
-                | t when (isSubtypeOf node.Env t TUnit) ->
+                | t when (isSubtypeOf node.Env Set.empty t TUnit) ->
                     Asm() // Nothing to do
-                | t when (isSubtypeOf node.Env t TFloat) ->
+                | t when (isSubtypeOf node.Env Set.empty t TFloat) ->
                     Asm(RV.FLW_S(FPReg.r(env.FPTarget), Imm12(offset * 4),
                                  Reg.r(env.Target)),
                         $"Retrieve value of struct field '%s{field}'")
@@ -951,7 +951,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                 let storingCode =
                     let folder (acc: Asm) (i: int) =
                         match init.Type with
-                        | t when isSubtypeOf init.Env t TInt ->
+                        | t when isSubtypeOf init.Env Set.empty t TInt ->
                             acc.AddText(RV.SW(Reg.r(env.Target + 1u), Imm12((i + 1) * 4), Reg.r(env.Target)))
                         | _ -> failwithf$"Not supported right now"
                     List.fold folder (Asm()) [0 .. n-1]
