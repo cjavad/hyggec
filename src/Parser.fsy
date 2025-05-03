@@ -76,6 +76,7 @@ let mkNode (parseState: IParseState, inputIdx: int, e: UntypedExpr): UntypedAST 
 %token SEMI EOF COLON LARROW RARROW COMMA DOT
 
 // Built-in statements
+%token SYSCALL
 %token READ_INT
 %token READ_FLOAT
 %token PRINT
@@ -237,6 +238,8 @@ unaryExpr:
   | PRINT LPAR simpleExpr RPAR    { mkNode(parseState, 1, Expr.Print($3)) }
   | PRINTLN LPAR simpleExpr RPAR  { mkNode(parseState, 1, Expr.PrintLn($3)) }
   | ASSERT LPAR simpleExpr RPAR   { mkNode(parseState, 1, Expr.Assertion($3)) }
+  | SYSCALL LPAR LIT_INT RPAR                     { mkNode(parseState, 1, Expr.Syscall($3, [])) }
+  | SYSCALL LPAR LIT_INT COMMA exprCommaSeq RPAR  { mkNode(parseState, 1, Expr.Syscall($3, $5)) }
   | ascriptionExpr                { $1 }
   | primary parenExprCommaSeq     { mkNode(parseState, 1, Expr.Application($1, $2))}
 
