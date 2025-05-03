@@ -10,6 +10,7 @@ open AST
 open RISCV
 open Type
 open Typechecker
+open Syscalls
 
 
 /// Exit code used in the generated assembly to signal an assertion violation.
@@ -29,14 +30,15 @@ type internal Storage =
 
 
 /// Code generation environment.
-type internal CodegenEnv = {
-    /// Target register number for the result of non-floating-point expressions.
-    Target: uint
-    /// Target register number for the result of floating-point expressions.
-    FPTarget: uint
-    /// Storage information about known variables.
-    VarStorage: Map<string, Storage>
-}
+type internal CodegenEnv =
+    {
+        /// Target register number for the result of non-floating-point expressions.
+        Target: uint
+        /// Target register number for the result of floating-point expressions.
+        FPTarget: uint
+        /// Storage information about known variables.
+        VarStorage: Map<string, Storage>
+    }
 
 
 /// Code generation function: compile the expression in the given AST node so
@@ -44,74 +46,71 @@ type internal CodegenEnv = {
 /// numbers (specified in the given codegen 'env'ironment).  IMPORTANT: the
 /// generated code must never modify the contents of register numbers lower than
 /// the given targets.
-let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
+let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
     match node.Expr with
     | UnitVal -> Asm() // Nothing to do
 
     | BoolVal(v) ->
         /// Boolean constant turned into integer 1 if true, or 0 if false
         let value = if v then 1 else 0
-        Asm(RV.LI(Reg.r(env.Target), value), $"Bool value '%O{v}'")
+        Asm(RV.LI(Reg.r (env.Target), value), $"Bool value '%O{v}'")
 
     | IntVal(v) ->
-        if (v &&& ~~~0xfff = v) then
-            Asm(RV.LUI(Reg.r(env.Target), Imm20(v >>> 12)))
+        if (v &&& ~~~ 0xfff = v) then
+            Asm(RV.LUI(Reg.r (env.Target), Imm20(v >>> 12)))
         else
-            Asm(RV.LI(Reg.r(env.Target), v))
+            Asm(RV.LI(Reg.r (env.Target), v))
 
     | FloatVal(v) ->
         // We convert the float value into its bytes, and load it as immediate
         let bytes = System.BitConverter.GetBytes(v)
-        if (not System.BitConverter.IsLittleEndian)
-            then System.Array.Reverse(bytes) // RISC-V is little-endian
+
+        if (not System.BitConverter.IsLittleEndian) then
+            System.Array.Reverse(bytes) // RISC-V is little-endian
+
         let word: int32 = System.BitConverter.ToInt32(bytes)
-        Asm([ (RV.LI(Reg.r(env.Target), word), $"Float value %f{v}")
-              (RV.FMV_W_X(FPReg.r(env.FPTarget), Reg.r(env.Target)), "") ])
+
+        Asm(
+            [ (RV.LI(Reg.r (env.Target), word), $"Float value %f{v}")
+              (RV.FMV_W_X(FPReg.r (env.FPTarget), Reg.r (env.Target)), "") ]
+        )
 
     | StringVal(v) ->
         // Label marking the string constant in the data segment
         let label = Util.genSymbol "string_val"
-        Asm().AddData(label, Alloc.String(v))
-             .AddText(RV.LA(Reg.r(env.Target), label))
+        Asm().AddData(label, Alloc.String(v)).AddText(RV.LA(Reg.r (env.Target), label))
 
     | Var(name) ->
         // To compile a variable, we inspect its type and where it is stored
         match node.Type with
-        | t when (isSubtypeOf node.Env t TUnit)
-            -> Asm() // A unit-typed variable is just ignored
+        | t when (isSubtypeOf node.Env t TUnit) -> Asm() // A unit-typed variable is just ignored
         | t when (isSubtypeOf node.Env t TFloat) ->
             match (env.VarStorage.TryFind name) with
-            | Some(Storage.FPReg(fpreg)) ->
-                Asm(RV.FMV_S(FPReg.r(env.FPTarget), fpreg),
-                    $"Load variable '%s{name}'")
+            | Some(Storage.FPReg(fpreg)) -> Asm(RV.FMV_S(FPReg.r (env.FPTarget), fpreg), $"Load variable '%s{name}'")
             | Some(Storage.Label(lab)) ->
-                Asm([ (RV.LA(Reg.r(env.Target), lab),
-                       $"Load address of variable '%s{name}'")
-                      (RV.LW(Reg.r(env.Target), Imm12(0), Reg.r(env.Target)),
-                       $"Load value of variable '%s{name}'")
-                      (RV.FMV_W_X(FPReg.r(env.FPTarget), Reg.r(env.Target)),
-                       $"Transfer '%s{name}' to fp register") ])
+                Asm(
+                    [ (RV.LA(Reg.r (env.Target), lab), $"Load address of variable '%s{name}'")
+                      (RV.LW(Reg.r (env.Target), Imm12(0), Reg.r (env.Target)), $"Load value of variable '%s{name}'")
+                      (RV.FMV_W_X(FPReg.r (env.FPTarget), Reg.r (env.Target)), $"Transfer '%s{name}' to fp register") ]
+                )
             | Some(Storage.Reg(_)) as st ->
                 failwith $"BUG: variable %s{name} of type %O{t} has unexpected storage %O{st}"
             | None -> failwith $"BUG: float variable without storage: %s{name}"
-        | t ->  // Default case for variables holding integer-like values
+        | t -> // Default case for variables holding integer-like values
             match (env.VarStorage.TryFind name) with
-            | Some(Storage.Reg(reg)) ->
-                Asm(RV.MV(Reg.r(env.Target), reg), $"Load variable '%s{name}'")
+            | Some(Storage.Reg(reg)) -> Asm(RV.MV(Reg.r (env.Target), reg), $"Load variable '%s{name}'")
             | Some(Storage.Label(lab)) ->
                 match (expandType node.Env node.Type) with
-                    | TFun(_,_) ->
-                        Asm(RV.LA(Reg.r(env.Target), lab),
-                            $"Load variable '%s{name}' (labmda term)")
-                    | _ ->
-                        Asm([ (RV.LA(Reg.r(env.Target), lab),
-                               $"Load address of variable '%s{name}'")
-                              (RV.LW(Reg.r(env.Target), Imm12(0), Reg.r(env.Target)),
-                               $"Load value of variable '%s{name}'") ])
+                | TFun(_, _) -> Asm(RV.LA(Reg.r (env.Target), lab), $"Load variable '%s{name}' (labmda term)")
+                | _ ->
+                    Asm(
+                        [ (RV.LA(Reg.r (env.Target), lab), $"Load address of variable '%s{name}'")
+                          (RV.LW(Reg.r (env.Target), Imm12(0), Reg.r (env.Target)), $"Load value of variable '%s{name}'") ]
+                    )
             | Some(Storage.FPReg(_)) as st ->
                 failwith $"BUG: variable %s{name} of type %O{t} has unexpected storage %O{st}"
             | None -> failwith $"BUG: variable without storage: %s{name}"
-    
+
     | Sub(lhs, rhs)
     | Add(lhs, rhs)
     | Div(lhs, rhs)
@@ -130,62 +129,45 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             /// Target register for the rhs expression
             let rtarget = env.Target + 1u
             /// Generated code for the rhs expression
-            let rAsm = doCodegen {env with Target = rtarget} rhs
+            let rAsm = doCodegen { env with Target = rtarget } rhs
+
             /// Generated code for the numerical operation
             let opAsm =
                 match expr with
-                    | Sub(_,_) ->
-                        Asm(RV.SUB(Reg.r(env.Target),
-                                   Reg.r(env.Target), Reg.r(rtarget)))
-                    | Add(_,_) ->
-                        Asm(RV.ADD(Reg.r(env.Target),
-                                   Reg.r(env.Target), Reg.r(rtarget)))
-                    | Mult(_,_) ->
-                        Asm(RV.MUL(Reg.r(env.Target),
-                                   Reg.r(env.Target), Reg.r(rtarget)))
-                    | Div(_,_) ->
-                        Asm(RV.DIV(Reg.r(env.Target),
-                                   Reg.r(env.Target), Reg.r(rtarget)))
-                    | Rem(_,_) ->
-                        Asm(RV.REM(Reg.r(env.Target),
-                                   Reg.r(env.Target), Reg.r(rtarget)))
-                    | x -> failwith $"BUG: unexpected operation %O{x}"
+                | Sub(_, _) -> Asm(RV.SUB(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
+                | Add(_, _) -> Asm(RV.ADD(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
+                | Mult(_, _) -> Asm(RV.MUL(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
+                | Div(_, _) -> Asm(RV.DIV(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
+                | Rem(_, _) -> Asm(RV.REM(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
+                | x -> failwith $"BUG: unexpected operation %O{x}"
             // Put everything together
             lAsm ++ rAsm ++ opAsm
         | t when (isSubtypeOf node.Env t TFloat) ->
             /// Target register for the rhs expression
             let rfptarget = env.FPTarget + 1u
             /// Generated code for the rhs expression
-            let rAsm = doCodegen {env with FPTarget = rfptarget} rhs
+            let rAsm = doCodegen { env with FPTarget = rfptarget } rhs
+
             /// Generated code for the numerical operation
             let opAsm =
                 match expr with
-                | Sub(_,_) ->
-                    Asm(RV.FSUB_S(FPReg.r(env.FPTarget),
-                                  FPReg.r(env.FPTarget), FPReg.r(rfptarget)))
-                | Add(_,_) ->
-                    Asm(RV.FADD_S(FPReg.r(env.FPTarget),
-                                  FPReg.r(env.FPTarget), FPReg.r(rfptarget)))
-                | Mult(_,_) ->
-                    Asm(RV.FMUL_S(FPReg.r(env.FPTarget),
-                                  FPReg.r(env.FPTarget), FPReg.r(rfptarget)))
-                | Div(_,_) ->
-                    Asm(RV.FDIV_S(FPReg.r(env.FPTarget),
-                                  FPReg.r(env.FPTarget), FPReg.r(rfptarget)))
-                       
+                | Sub(_, _) -> Asm(RV.FSUB_S(FPReg.r (env.FPTarget), FPReg.r (env.FPTarget), FPReg.r (rfptarget)))
+                | Add(_, _) -> Asm(RV.FADD_S(FPReg.r (env.FPTarget), FPReg.r (env.FPTarget), FPReg.r (rfptarget)))
+                | Mult(_, _) -> Asm(RV.FMUL_S(FPReg.r (env.FPTarget), FPReg.r (env.FPTarget), FPReg.r (rfptarget)))
+                | Div(_, _) -> Asm(RV.FDIV_S(FPReg.r (env.FPTarget), FPReg.r (env.FPTarget), FPReg.r (rfptarget)))
+
                 | x -> failwith $"BUG: unexpected operation %O{x}"
             // Put everything together
             lAsm ++ rAsm ++ opAsm
-        | t ->
-            failwith $"BUG: numerical operation codegen invoked on invalid type %O{t}"
+        | t -> failwith $"BUG: numerical operation codegen invoked on invalid type %O{t}"
 
     | BNot(arg) ->
         let aAsm = doCodegen env arg
-        
-        let opAsm = Asm(RV.NOT(Reg.r(env.Target), Reg.r(env.Target)))
+
+        let opAsm = Asm(RV.NOT(Reg.r (env.Target), Reg.r (env.Target)))
 
         aAsm ++ opAsm
-        
+
     | BAnd(lhs, rhs)
     | BOr(lhs, rhs)
     | BXor(lhs, rhs)
@@ -196,30 +178,25 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         /// Target register for the rhs expression
         let rtarget = env.Target + 1u
         /// Generated code for the rhs expression
-        let rAsm = doCodegen {env with Target = rtarget} rhs
+        let rAsm = doCodegen { env with Target = rtarget } rhs
 
-        let opAsm = 
+        let opAsm =
             match expr with
-            | BAnd(_,_) ->
-                Asm(RV.AND(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
-            | BOr(_,_) ->
-                Asm(RV.OR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
-            | BXor(_,_) ->
-                Asm(RV.XOR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
-            | BSL(_,_) ->
-                Asm(RV.SLL(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
-            | BSR(_,_) ->
-                Asm(RV.SRL(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | BAnd(_, _) -> Asm(RV.AND(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
+            | BOr(_, _) -> Asm(RV.OR(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
+            | BXor(_, _) -> Asm(RV.XOR(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
+            | BSL(_, _) -> Asm(RV.SLL(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
+            | BSR(_, _) -> Asm(RV.SRL(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
             | x -> failwith $"BUG: unexpected operation %O{x}"
 
         lAsm ++ rAsm ++ opAsm
     | Sqrt(arg) ->
         let asm = doCodegen env arg
+
         match (arg.Type) with
-            | t when (isSubtypeOf arg.Env t TFloat) -> 
-                asm.AddText(RV.FSQRT_S(FPReg.r(env.FPTarget),
-                                       FPReg.r(env.FPTarget)))
-            | t -> failwith $"BUG: unexpected operation %O{t}"
+        | t when (isSubtypeOf arg.Env t TFloat) ->
+            asm.AddText(RV.FSQRT_S(FPReg.r (env.FPTarget), FPReg.r (env.FPTarget)))
+        | t -> failwith $"BUG: unexpected operation %O{t}"
     | And(lhs, rhs)
     | Xor(lhs, rhs)
     | SCAnd(lhs, rhs)
@@ -228,26 +205,22 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         // Code generation for logical 'and' and 'or' is very similar: we
         // compile the lhs and rhs giving them different target registers, and
         // then apply the relevant assembly operation(s) on their results.
-        
+
         /// Generated code for the lhs expression
         let lAsm = doCodegen env lhs
         /// Target register for the rhs expression
         let rtarget = env.Target + 1u
         /// Generated code for the rhs expression
-        let rAsm = doCodegen {env with Target = rtarget} rhs
+        let rAsm = doCodegen { env with Target = rtarget } rhs
+
         /// Generated code for the logical operation
         let opAsm =
             match expr with
-            | And(_,_) ->
-                Asm(RV.AND(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
-            | Or(_,_) ->
-                Asm(RV.OR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
-            | Xor(_,_) ->
-                Asm(RV.XOR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
-            | SCAnd(_,_) ->
-                Asm(RV.AND(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
-            | SCOr(_,_) -> 
-                Asm(RV.OR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | And(_, _) -> Asm(RV.AND(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
+            | Or(_, _) -> Asm(RV.OR(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
+            | Xor(_, _) -> Asm(RV.XOR(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
+            | SCAnd(_, _) -> Asm(RV.AND(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
+            | SCOr(_, _) -> Asm(RV.OR(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
             | x -> failwith $"BUG: unexpected operation %O{x}"
         // Put everything together
         lAsm ++ rAsm ++ opAsm
@@ -256,10 +229,10 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         /// Generated code for the argument expression (note that we don't need
         /// to increase its target register)
         let asm = doCodegen env arg
-        asm.AddText(RV.SEQZ(Reg.r(env.Target), Reg.r(env.Target)))
+        asm.AddText(RV.SEQZ(Reg.r (env.Target), Reg.r (env.Target)))
     | Neg(arg) ->
         let asm = doCodegen env arg
-        asm.AddText(RV.NEG(Reg.r(env.Target), Reg.r(env.Target)))
+        asm.AddText(RV.NEG(Reg.r (env.Target), Reg.r (env.Target)))
     | Eq(lhs, rhs)
     | Greater(lhs, rhs)
     | LessEq(lhs, rhs)
@@ -287,17 +260,19 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             /// Target register for the rhs expression
             let rtarget = env.Target + 1u
             /// Generated code for the rhs expression
-            let rAsm = doCodegen {env with Target = rtarget} rhs
-            
+            let rAsm = doCodegen { env with Target = rtarget } rhs
+
             /// Human-readable prefix for jump labels, describing the kind of
             /// relational operation we are compiling
-            let labelName = match expr with
-                            | Eq(_,_) -> "eq"
-                            | Less(_,_) -> "less"
-                            | Greater(_,_) -> "greater"
-                            | LessEq(_,_) -> "lesseq"
-                            | GreaterEq(_,_) -> "greatereq"
-                            | x -> failwith $"BUG: unexpected operation %O{x}"
+            let labelName =
+                match expr with
+                | Eq(_, _) -> "eq"
+                | Less(_, _) -> "less"
+                | Greater(_, _) -> "greater"
+                | LessEq(_, _) -> "lesseq"
+                | GreaterEq(_, _) -> "greatereq"
+                | x -> failwith $"BUG: unexpected operation %O{x}"
+
             /// Label to jump to when the comparison is true
             let trueLabel = Util.genSymbol $"%O{labelName}_true"
             /// Label to mark the end of the comparison code
@@ -306,62 +281,55 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             /// Codegen for the relational operation between lhs and rhs
             let opAsm =
                 match expr with
-                | Eq(_,_) ->
-                    Asm(RV.BEQ(Reg.r(env.Target), Reg.r(rtarget), trueLabel))
-                | Less(_,_) ->
-                    Asm(RV.BLT(Reg.r(env.Target), Reg.r(rtarget), trueLabel))
+                | Eq(_, _) -> Asm(RV.BEQ(Reg.r (env.Target), Reg.r (rtarget), trueLabel))
+                | Less(_, _) -> Asm(RV.BLT(Reg.r (env.Target), Reg.r (rtarget), trueLabel))
                 | x -> failwith $"BUG: unexpected operation %O{x}"
 
             // Put everything together
             (lAsm ++ rAsm ++ opAsm)
-                .AddText([
-                    (RV.LI(Reg.r(env.Target), 0), "Comparison result is false")
-                    (RV.J(endLabel), "")
-                    (RV.LABEL(trueLabel), "")
-                    (RV.LI(Reg.r(env.Target), 1), "Comparison result is true")
-                    (RV.LABEL(endLabel), "")
-                ])
+                .AddText(
+                    [ (RV.LI(Reg.r (env.Target), 0), "Comparison result is false")
+                      (RV.J(endLabel), "")
+                      (RV.LABEL(trueLabel), "")
+                      (RV.LI(Reg.r (env.Target), 1), "Comparison result is true")
+                      (RV.LABEL(endLabel), "") ]
+                )
         | t when (isSubtypeOf lhs.Env t TFloat) ->
             /// Target register for the rhs expression
             let rfptarget = env.FPTarget + 1u
             /// Generated code for the rhs expression
-            let rAsm = doCodegen {env with FPTarget = rfptarget} rhs
+            let rAsm = doCodegen { env with FPTarget = rfptarget } rhs
+
             /// Generated code for the relational operation
             let opAsm =
                 match expr with
-                | Eq(_,_) ->
-                    Asm(RV.FEQ_S(Reg.r(env.Target), FPReg.r(env.FPTarget), FPReg.r(rfptarget)))
-                | Less(_,_) ->
-                    Asm(RV.FLT_S(Reg.r(env.Target), FPReg.r(env.FPTarget), FPReg.r(rfptarget)))
-                | LessEq(_,_) ->
-                    Asm(RV.FLE_S(Reg.r(env.Target), FPReg.r(env.FPTarget), FPReg.r(rfptarget)))
-                | Greater(_,_) ->
-                    Asm(RV.FLE_S(Reg.r(env.Target), FPReg.r(rfptarget), FPReg.r(env.FPTarget)))
-                | GreaterEq(_,_) ->
-                    Asm(RV.FLT_S(Reg.r(env.Target), FPReg.r(rfptarget), FPReg.r(env.FPTarget)))
+                | Eq(_, _) -> Asm(RV.FEQ_S(Reg.r (env.Target), FPReg.r (env.FPTarget), FPReg.r (rfptarget)))
+                | Less(_, _) -> Asm(RV.FLT_S(Reg.r (env.Target), FPReg.r (env.FPTarget), FPReg.r (rfptarget)))
+                | LessEq(_, _) -> Asm(RV.FLE_S(Reg.r (env.Target), FPReg.r (env.FPTarget), FPReg.r (rfptarget)))
+                | Greater(_, _) -> Asm(RV.FLE_S(Reg.r (env.Target), FPReg.r (rfptarget), FPReg.r (env.FPTarget)))
+                | GreaterEq(_, _) -> Asm(RV.FLT_S(Reg.r (env.Target), FPReg.r (rfptarget), FPReg.r (env.FPTarget)))
                 | x -> failwith $"BUG: unexpected operation %O{x}"
             // Put everything together
             (lAsm ++ rAsm ++ opAsm)
-        | t ->
-            failwith $"BUG: relational operation codegen invoked on invalid type %O{t}"
+        | t -> failwith $"BUG: relational operation codegen invoked on invalid type %O{t}"
 
     | ReadInt ->
-        (beforeSysCall [Reg.a0] [])
-            .AddText([
-                (RV.LI(Reg.a7, 5), "RARS syscall: ReadInt")
-                (RV.ECALL, "")
-                (RV.MV(Reg.r(env.Target), Reg.a0), "Move syscall result to target")
-            ])
-            ++ (afterSysCall [Reg.a0] [])
+        (beforeSysCall [ Reg.a0 ] [])
+            .AddText(
+                [ (RV.LI(Reg.a7, 5), "RARS syscall: ReadInt")
+                  (RV.ECALL, "")
+                  (RV.MV(Reg.r (env.Target), Reg.a0), "Move syscall result to target") ]
+            )
+        ++ (afterSysCall [ Reg.a0 ] [])
 
     | ReadFloat ->
-        (beforeSysCall [] [FPReg.fa0])
-            .AddText([
-                (RV.LI(Reg.a7, 6), "RARS syscall: ReadFloat")
-                (RV.ECALL, "")
-                (RV.FMV_S(FPReg.r(env.FPTarget), FPReg.fa0), "Move syscall result to target")
-            ])
-            ++ (afterSysCall [] [FPReg.fa0])
+        (beforeSysCall [] [ FPReg.fa0 ])
+            .AddText(
+                [ (RV.LI(Reg.a7, 6), "RARS syscall: ReadFloat")
+                  (RV.ECALL, "")
+                  (RV.FMV_S(FPReg.r (env.FPTarget), FPReg.fa0), "Move syscall result to target") ]
+            )
+        ++ (afterSysCall [] [ FPReg.fa0 ])
 
     | Print(arg) ->
         /// Compiled code for the 'print' argument, leaving its result on the
@@ -374,60 +342,61 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             let strFalse = Util.genSymbol "false"
             let printFalse = Util.genSymbol "print_true"
             let printExec = Util.genSymbol "print_execute"
-            argCode.AddData(strTrue, Alloc.String("true"))
+
+            argCode
+                .AddData(strTrue, Alloc.String("true"))
                 .AddData(strFalse, Alloc.String("false"))
-                ++ (beforeSysCall [Reg.a0] [])
-                  .AddText([
-                    (RV.BEQZ(Reg.r(env.Target), printFalse), "")
-                    (RV.LA(Reg.a0, strTrue), "String to print via syscall")
-                    (RV.J(printExec), "")
-                    (RV.LABEL(printFalse), "")
-                    (RV.LA(Reg.a0, strFalse), "String to print via syscall")
-                    (RV.LABEL(printExec), "")
-                    (RV.LI(Reg.a7, 4), "RARS syscall: PrintString")
-                    (RV.ECALL, "")
-                  ])
-                  ++ (afterSysCall [Reg.a0] [])
+            ++ (beforeSysCall [ Reg.a0 ] [])
+                .AddText(
+                    [ (RV.BEQZ(Reg.r (env.Target), printFalse), "")
+                      (RV.LA(Reg.a0, strTrue), "String to print via syscall")
+                      (RV.J(printExec), "")
+                      (RV.LABEL(printFalse), "")
+                      (RV.LA(Reg.a0, strFalse), "String to print via syscall")
+                      (RV.LABEL(printExec), "")
+                      (RV.LI(Reg.a7, 4), "RARS syscall: PrintString")
+                      (RV.ECALL, "") ]
+                )
+            ++ (afterSysCall [ Reg.a0 ] [])
         | t when (isSubtypeOf arg.Env t TInt) ->
             argCode
-            ++ (beforeSysCall [Reg.a0] [])
-                .AddText([
-                    (RV.MV(Reg.a0, Reg.r(env.Target)), "Copy to a0 for printing")
-                    (RV.LI(Reg.a7, 1), "RARS syscall: PrintInt")
-                    (RV.ECALL, "")
-                ])
-                ++ (afterSysCall [Reg.a0] [])
+            ++ (beforeSysCall [ Reg.a0 ] [])
+                .AddText(
+                    [ (RV.MV(Reg.a0, Reg.r (env.Target)), "Copy to a0 for printing")
+                      (RV.LI(Reg.a7, 1), "RARS syscall: PrintInt")
+                      (RV.ECALL, "") ]
+                )
+            ++ (afterSysCall [ Reg.a0 ] [])
         | t when (isSubtypeOf arg.Env t TFloat) ->
             argCode
-            ++ (beforeSysCall [] [FPReg.fa0])
-                .AddText([
-                    (RV.FMV_S(FPReg.fa0, FPReg.r(env.FPTarget)), "Copy to fa0 for printing")
-                    (RV.LI(Reg.a7, 2), "RARS syscall: PrintFloat")
-                    (RV.ECALL, "")
-                ])
-                ++ (afterSysCall [] [FPReg.fa0])
+            ++ (beforeSysCall [] [ FPReg.fa0 ])
+                .AddText(
+                    [ (RV.FMV_S(FPReg.fa0, FPReg.r (env.FPTarget)), "Copy to fa0 for printing")
+                      (RV.LI(Reg.a7, 2), "RARS syscall: PrintFloat")
+                      (RV.ECALL, "") ]
+                )
+            ++ (afterSysCall [] [ FPReg.fa0 ])
         | t when (isSubtypeOf arg.Env t TString) ->
             argCode
-            ++ (beforeSysCall [Reg.a0] [])
-                .AddText([
-                    (RV.MV(Reg.a0, Reg.r(env.Target)), "Copy to a0 for printing")
-                    (RV.LI(Reg.a7, 4), "RARS syscall: PrintString")
-                    (RV.ECALL, "")
-                ])
-                ++ (afterSysCall [Reg.a0] [])
-        | t ->
-            failwith $"BUG: Print codegen invoked on unsupported type %O{t}"
+            ++ (beforeSysCall [ Reg.a0 ] [])
+                .AddText(
+                    [ (RV.MV(Reg.a0, Reg.r (env.Target)), "Copy to a0 for printing")
+                      (RV.LI(Reg.a7, 4), "RARS syscall: PrintString")
+                      (RV.ECALL, "") ]
+                )
+            ++ (afterSysCall [ Reg.a0 ] [])
+        | t -> failwith $"BUG: Print codegen invoked on unsupported type %O{t}"
 
     | PrintLn(arg) ->
         // Recycle codegen for Print above, then also output a newline
-        (doCodegen env {node with Expr = Print(arg)})
-        ++ (beforeSysCall [Reg.a0] [])
-            .AddText([
-                (RV.LI(Reg.a7, 11), "RARS syscall: PrintChar")
-                (RV.LI(Reg.a0, int('\n')), "Character to print (newline)")
-                (RV.ECALL, "")
-            ])
-            ++ (afterSysCall [Reg.a0] [])
+        (doCodegen env { node with Expr = Print(arg) })
+        ++ (beforeSysCall [ Reg.a0 ] [])
+            .AddText(
+                [ (RV.LI(Reg.a7, 11), "RARS syscall: PrintChar")
+                  (RV.LI(Reg.a0, int ('\n')), "Character to print (newline)")
+                  (RV.ECALL, "") ]
+            )
+        ++ (afterSysCall [ Reg.a0 ] [])
     | Preinc(arg) ->
         match (arg.Expr) with
         | Var(name) ->
@@ -435,12 +404,24 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             | Some(_) ->
                 match (expandType arg.Env arg.Type) with
                 | t when (isSubtypeOf arg.Env t TInt) ->
-                    let addNode = { node with Expr = Add(arg, { node with Expr = IntVal(1) }) }
-                    let assignNode = { node with Expr = Assign(arg, addNode) }
+                    let addNode =
+                        { node with
+                            Expr = Add(arg, { node with Expr = IntVal(1) }) }
+
+                    let assignNode =
+                        { node with
+                            Expr = Assign(arg, addNode) }
+
                     doCodegen env assignNode
                 | t when (isSubtypeOf arg.Env t TFloat) ->
-                    let addNode = { node with Expr = Add(arg, { node with Expr = FloatVal(1.0f) }) }
-                    let assignNode = { node with Expr = Assign(arg, addNode) }
+                    let addNode =
+                        { node with
+                            Expr = Add(arg, { node with Expr = FloatVal(1.0f) }) }
+
+                    let assignNode =
+                        { node with
+                            Expr = Assign(arg, addNode) }
+
                     doCodegen env assignNode
                 | _ -> failwith $"Preinc on variable with unsupported type"
             | None -> failwith $"Preinc on undeclared or immut variable"
@@ -456,9 +437,13 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                     // First, we load the original value to env.Target
                     let origCode = doCodegen env arg
                     // We make node to for addition between x and int 1
-                    let addNode = { node with Expr = Add(arg, { node with Expr = IntVal(1) }) }
+                    let addNode =
+                        { node with
+                            Expr = Add(arg, { node with Expr = IntVal(1) }) }
                     // Node's responsibility is to assign x with the node x + 1
-                    let assignNode = { node with Expr = Assign(arg, addNode) }
+                    let assignNode =
+                        { node with
+                            Expr = Assign(arg, addNode) }
                     // We need to generate a new target (env.Target + 1u) for x + 1 so the original doesn't
                     // get overwritten because otherwise it would just be a preincrement
                     let assignCode = doCodegen { env with Target = env.Target + 1u } assignNode
@@ -470,18 +455,75 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                 | t when (isSubtypeOf arg.Env t TFloat) ->
                     // Same as the one above but floaty :D
                     let origCode = doCodegen env arg
-                    let addNode = { node with Expr = Add(arg, { node with Expr = FloatVal(1.0f) }) }
-                    let assignNode = { node with Expr = Assign(arg, addNode) }
-                    let assignCode = doCodegen { env with FPTarget = env.FPTarget + 1u } assignNode
+
+                    let addNode =
+                        { node with
+                            Expr = Add(arg, { node with Expr = FloatVal(1.0f) }) }
+
+                    let assignNode =
+                        { node with
+                            Expr = Assign(arg, addNode) }
+
+                    let assignCode =
+                        doCodegen
+                            { env with
+                                FPTarget = env.FPTarget + 1u }
+                            assignNode
+
                     origCode ++ assignCode
-                    // Will make error messages better
+                // Will make error messages better
                 | _ -> failwith $"Postinc on variable with unsupported type"
             | None -> failwith $"Postinc on undeclared or immut variable"
-        | _ -> failwith $"Postinc only works on mut" 
+        | _ -> failwith $"Postinc only works on mut"
+
+    | Syscall(number, args) ->
+        let name, argTypes, retType =
+            match findSyscall Platform.RARS number with
+            | Some(Definition(name, _, argTypes, retType)) -> name, argTypes, retType
+            | None -> failwith $"BUG: syscall %d{number} not found"
+
+        let argIsFloat = List.map (fun t -> isSubtypeOf node.Env t TFloat) argTypes
+        let retIsFloat = isSubtypeOf node.Env retType TFloat
+
+        let (floatArgs, intArgs) =
+            List.partition (fun t -> isSubtypeOf node.Env t TFloat) argTypes
+
+        let floatArgRegs = List.init floatArgs.Length (fun i -> FPReg.fa (uint32 i))
+        let intArgRegs = List.init intArgs.Length (fun i -> Reg.a (uint32 i))
+
+        let (asm, _, _) =
+            List.fold
+                (fun (asm, nextReg, nextFpReg) (arg, isFloat) ->
+                    match isFloat with
+                    | true ->
+                        (asm
+                         ++ doCodegen
+                             { env with
+                                 FPTarget = FPReg.fa(nextFpReg).Number }
+                             arg,
+                         nextReg,
+                         nextFpReg + 1u)
+                    | false ->
+                        (asm
+                         ++ doCodegen
+                             { env with
+                                 Target = Reg.a(nextReg).Number }
+                             arg,
+                         nextReg + 1u,
+                         nextFpReg))
+                (beforeSysCall intArgRegs floatArgRegs, 0u, 0u)
+                (List.zip args argIsFloat)
+
         
-    | Syscall(a, b) ->
-        // Oh baby so many syscalls.
-        failwith "not implemented"
+        let asm = asm.AddText(RV.LI(Reg.a7, number), $"RARS syscall: %s{name}")
+        let asm = asm.AddText(RV.ECALL, "")
+
+        let asm =
+            match retIsFloat with
+            | true -> asm.AddText(RV.FMV_X_W(Reg.r (env.Target), FPReg.fa0), "Move syscall result to target")
+            | false -> asm.AddText(RV.MV(Reg.r (env.Target), Reg.a0), "Move syscall result to target")
+
+        asm ++ (afterSysCall intArgRegs floatArgRegs)
 
     | If(condition, ifTrue, ifFalse) ->
         /// Label to jump to when the 'if' condition is true
@@ -501,28 +543,23 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         // if the compilation of 'ifTrue' and/or 'ifFalse' produces a large
         // amount of assembly code
         (doCodegen env condition)
-            .AddText([ (RV.BNEZ(Reg.r(env.Target), labelTrue),
-                        "Jump when 'if' condition is true")
-                       (RV.LA(Reg.r(env.Target), labelFalse),
-                        "Load the address of the 'false' branch of the 'if' code")
-                       (RV.JR(Reg.r(env.Target)),
-                        "Jump to the 'false' branch of the 'if' code")
-                       (RV.LABEL(labelTrue),
-                        "Beginning of the 'true' branch of the 'if' code") ])
-            ++ (doCodegen env ifTrue)
-                .AddText([ (RV.LA(Reg.r(env.Target + 1u), labelEnd),
-                            "Load the address of the end of the 'if' code")
-                           (RV.JR(Reg.r(env.Target + 1u)),
-                            "Jump to skip the 'false' branch of 'if' code")
-                           (RV.LABEL(labelFalse),
-                            "Beginning of the 'false' branch of the 'if' code") ])
-                ++ (doCodegen env ifFalse)
-                    .AddText(RV.LABEL(labelEnd), "End of the 'if' code")
+            .AddText(
+                [ (RV.BNEZ(Reg.r (env.Target), labelTrue), "Jump when 'if' condition is true")
+                  (RV.LA(Reg.r (env.Target), labelFalse), "Load the address of the 'false' branch of the 'if' code")
+                  (RV.JR(Reg.r (env.Target)), "Jump to the 'false' branch of the 'if' code")
+                  (RV.LABEL(labelTrue), "Beginning of the 'true' branch of the 'if' code") ]
+            )
+        ++ (doCodegen env ifTrue)
+            .AddText(
+                [ (RV.LA(Reg.r (env.Target + 1u), labelEnd), "Load the address of the end of the 'if' code")
+                  (RV.JR(Reg.r (env.Target + 1u)), "Jump to skip the 'false' branch of 'if' code")
+                  (RV.LABEL(labelFalse), "Beginning of the 'false' branch of the 'if' code") ]
+            )
+        ++ (doCodegen env ifFalse).AddText(RV.LABEL(labelEnd), "End of the 'if' code")
 
     | Seq(nodes) ->
         // We collect the code of each sequence node by folding over all nodes
-        let folder (asm: Asm) (node: TypedAST) =
-            asm ++ (doCodegen env node)
+        let folder (asm: Asm) (node: TypedAST) = asm ++ (doCodegen env node)
         List.fold folder (Asm()) nodes
 
     | Type(_, _, scope) ->
@@ -540,22 +577,27 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         // Check the assertion, and jump to 'passLabel' if it is true;
         // otherwise, fail
         (doCodegen env arg)
-            .AddText([
-                (RV.ADDI(Reg.r(env.Target), Reg.r(env.Target), Imm12(-1)), "")
-                (RV.BEQZ(Reg.r(env.Target), passLabel), "Jump if assertion OK")
-                (RV.LI(Reg.a7, 93), "RARS syscall: Exit2")
-                (RV.LI(Reg.a0, assertExitCode), "Assertion violation exit code")
-                (RV.ECALL, "")
-                (RV.LABEL(passLabel), "")
-            ])
+            .AddText(
+                [ (RV.ADDI(Reg.r (env.Target), Reg.r (env.Target), Imm12(-1)), "")
+                  (RV.BEQZ(Reg.r (env.Target), passLabel), "Jump if assertion OK")
+                  (RV.LI(Reg.a7, 93), "RARS syscall: Exit2")
+                  (RV.LI(Reg.a0, assertExitCode), "Assertion violation exit code")
+                  (RV.ECALL, "")
+                  (RV.LABEL(passLabel), "") ]
+            )
 
     // Special case for compiling a function with a given immutable name in the
     // input source file.  We recognise this case by checking whether the
     // 'Let...' declares 'name' as a Lambda expression with a TFun type
-    | Let(name, {Node.Expr = Lambda(args, body);
-                 Node.Type = TFun(targs, _)}, scope)
-    | LetT(name, _, {Node.Expr = Lambda(args, body);
-                     Node.Type = TFun(targs, _)}, scope) ->
+    | Let(name,
+          { Node.Expr = Lambda(args, body)
+            Node.Type = TFun(targs, _) },
+          scope)
+    | LetT(name,
+           _,
+           { Node.Expr = Lambda(args, body)
+             Node.Type = TFun(targs, _) },
+           scope) ->
         /// Assembly label to mark the position of the compiled function body.
         /// For readability, we make the label similar to the function name
         let funLabel = Util.genSymbol $"fun_%s{name}"
@@ -566,13 +608,13 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         let argNamesTypes = List.zip argNames targs
         /// Compiled function body
         let bodyCode = compileFunction argNamesTypes body env
-        
+
         /// Compiled function code where the function label is located just
         /// before the 'bodyCode', and everything is placed at the end of the
         /// Text segment (i.e. in the "PostText")
         let funCode =
-            (Asm(RV.LABEL(funLabel), $"Code for function '%s{name}'")
-                ++ bodyCode).TextToPostText
+            (Asm(RV.LABEL(funLabel), $"Code for function '%s{name}'") ++ bodyCode)
+                .TextToPostText
 
         /// Storage info where the name of the compiled function points to the
         /// label 'funLabel'
@@ -581,8 +623,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         // Finally, compile the 'let...'' scope with the newly-defined function
         // label in the variables storage, and append the 'funCode' above. The
         // 'scope' code leaves its result in the the 'let...' target register
-        (doCodegen {env with VarStorage = varStorage2} scope)
-            ++ funCode
+        (doCodegen { env with VarStorage = varStorage2 } scope) ++ funCode
 
     | Let(name, init, scope)
     | LetT(name, _, init, scope)
@@ -591,6 +632,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         /// 'target' register (which we overwrite at the end of the 'scope'
         /// execution)
         let initCode = doCodegen env init
+
         match init.Type with
         | t when (isSubtypeOf init.Env t TUnit) ->
             // The 'init' produces a unit value, i.e. nothing: we can keep using
@@ -600,61 +642,70 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         | t when (isSubtypeOf init.Env t TFloat) ->
             /// Target register for compiling the 'let' scope
             let scopeTarget = env.FPTarget + 1u
+
             /// Variable storage for compiling the 'let' scope
             let scopeVarStorage =
-                env.VarStorage.Add(name, Storage.FPReg(FPReg.r(env.FPTarget)))
+                env.VarStorage.Add(name, Storage.FPReg(FPReg.r (env.FPTarget)))
+
             /// Environment for compiling the 'let' scope
-            let scopeEnv = { env with FPTarget = scopeTarget
-                                      VarStorage = scopeVarStorage }
+            let scopeEnv =
+                { env with
+                    FPTarget = scopeTarget
+                    VarStorage = scopeVarStorage }
+
             initCode
-                ++ (doCodegen scopeEnv scope)
-                    .AddText(RV.FMV_S(FPReg.r(env.FPTarget),
-                                      FPReg.r(scopeTarget)),
-                             "Move result of 'let' scope expression into target register")
-        | _ ->  // Default case for integer-like initialisation expressions
+            ++ (doCodegen scopeEnv scope)
+                .AddText(
+                    RV.FMV_S(FPReg.r (env.FPTarget), FPReg.r (scopeTarget)),
+                    "Move result of 'let' scope expression into target register"
+                )
+        | _ -> // Default case for integer-like initialisation expressions
             /// Target register for compiling the 'let' scope
             let scopeTarget = env.Target + 1u
             /// Variable storage for compiling the 'let' scope
-            let scopeVarStorage =
-                env.VarStorage.Add(name, Storage.Reg(Reg.r(env.Target)))
+            let scopeVarStorage = env.VarStorage.Add(name, Storage.Reg(Reg.r (env.Target)))
+
             /// Environment for compiling the 'let' scope
-            let scopeEnv = { env with Target = scopeTarget
-                                      VarStorage = scopeVarStorage }
+            let scopeEnv =
+                { env with
+                    Target = scopeTarget
+                    VarStorage = scopeVarStorage }
+
             initCode
-                ++ (doCodegen scopeEnv scope)
-                    .AddText(RV.MV(Reg.r(env.Target), Reg.r(scopeTarget)),
-                             "Move 'let' scope result to 'let' target register")
+            ++ (doCodegen scopeEnv scope)
+                .AddText(
+                    RV.MV(Reg.r (env.Target), Reg.r (scopeTarget)),
+                    "Move 'let' scope result to 'let' target register"
+                )
 
     | Assign(lhs, rhs) ->
         match lhs.Expr with
         | Var(name) ->
             /// Code for the 'rhs', leaving its result in the target register
             let rhsCode = doCodegen env rhs
+
             match rhs.Type with
-            | t when (isSubtypeOf rhs.Env t TUnit) ->
-                rhsCode // No assignment to perform
+            | t when (isSubtypeOf rhs.Env t TUnit) -> rhsCode // No assignment to perform
             | _ ->
                 match (env.VarStorage.TryFind name) with
                 | Some(Storage.Reg(reg)) ->
-                    rhsCode.AddText(RV.MV(reg, Reg.r(env.Target)),
-                                    $"Assignment to variable %s{name}")
+                    rhsCode.AddText(RV.MV(reg, Reg.r (env.Target)), $"Assignment to variable %s{name}")
                 | Some(Storage.FPReg(reg)) ->
-                    rhsCode.AddText(RV.FMV_S(reg, FPReg.r(env.FPTarget)),
-                                    $"Assignment to variable %s{name}")
+                    rhsCode.AddText(RV.FMV_S(reg, FPReg.r (env.FPTarget)), $"Assignment to variable %s{name}")
                 | Some(Storage.Label(lab)) ->
                     match rhs.Type with
                     | t when (isSubtypeOf rhs.Env t TFloat) ->
-                        rhsCode.AddText([ (RV.LA(Reg.r(env.Target), lab),
-                                           $"Load address of variable '%s{name}'")
-                                          (RV.FSW_S(FPReg.r(env.FPTarget), Imm12(0),
-                                                    Reg.r(env.Target)),
-                                           $"Transfer value of '%s{name}' to memory") ])
+                        rhsCode.AddText(
+                            [ (RV.LA(Reg.r (env.Target), lab), $"Load address of variable '%s{name}'")
+                              (RV.FSW_S(FPReg.r (env.FPTarget), Imm12(0), Reg.r (env.Target)),
+                               $"Transfer value of '%s{name}' to memory") ]
+                        )
                     | _ ->
-                        rhsCode.AddText([ (RV.LA(Reg.r(env.Target + 1u), lab),
-                                           $"Load address of variable '%s{name}'")
-                                          (RV.SW(Reg.r(env.Target), Imm12(0),
-                                                 Reg.r(env.Target + 1u)),
-                                           $"Transfer value of '%s{name}' to memory") ])
+                        rhsCode.AddText(
+                            [ (RV.LA(Reg.r (env.Target + 1u), lab), $"Load address of variable '%s{name}'")
+                              (RV.SW(Reg.r (env.Target), Imm12(0), Reg.r (env.Target + 1u)),
+                               $"Transfer value of '%s{name}' to memory") ]
+                        )
                 | None -> failwith $"BUG: variable without storage: %s{name}"
         | FieldSelect(target, field) ->
             /// Assembly code for computing the 'target' object of which we are
@@ -662,7 +713,8 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             /// should be a struct memory address) in the target register.
             let selTargetCode = doCodegen env target
             /// Code for the 'rhs', leaving its result in the target+1 register
-            let rhsCode = doCodegen {env with Target = env.Target + 1u} rhs
+            let rhsCode = doCodegen { env with Target = env.Target + 1u } rhs
+
             match (expandType target.Env target.Type) with
             | TStruct(fields) ->
                 /// Names of the struct fields
@@ -670,28 +722,31 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                 /// Offset of the selected struct field from the beginning of
                 /// the struct
                 let offset = List.findIndex (fun f -> f = field) fieldNames
+
                 /// Assembly code that performs the field value assignment
                 let assignCode =
                     match rhs.Type with
-                    | t when (isSubtypeOf rhs.Env t TUnit) ->
-                        Asm() // Nothing to do
+                    | t when (isSubtypeOf rhs.Env t TUnit) -> Asm() // Nothing to do
                     | t when (isSubtypeOf rhs.Env t TFloat) ->
-                        Asm(RV.FSW_S(FPReg.r(env.FPTarget), Imm12(offset * 4),
-                                     Reg.r(env.Target)),
-                            $"Assigning value to struct field '%s{field}'")
+                        Asm(
+                            RV.FSW_S(FPReg.r (env.FPTarget), Imm12(offset * 4), Reg.r (env.Target)),
+                            $"Assigning value to struct field '%s{field}'"
+                        )
                     | _ ->
-                        Asm([(RV.SW(Reg.r(env.Target + 1u), Imm12(offset * 4),
-                                    Reg.r(env.Target)),
-                              $"Assigning value to struct field '%s{field}'")
-                             (RV.MV(Reg.r(env.Target), Reg.r(env.Target + 1u)),
-                              "Copying assigned value to target register")])
+                        Asm(
+                            [ (RV.SW(Reg.r (env.Target + 1u), Imm12(offset * 4), Reg.r (env.Target)),
+                               $"Assigning value to struct field '%s{field}'")
+                              (RV.MV(Reg.r (env.Target), Reg.r (env.Target + 1u)),
+                               "Copying assigned value to target register") ]
+                        )
                 // Put everything together
                 selTargetCode ++ rhsCode ++ assignCode
-            | t ->
-                failwith $"BUG: field selection on invalid object type: %O{t}"
+            | t -> failwith $"BUG: field selection on invalid object type: %O{t}"
         | _ ->
-            failwith ($"BUG: assignment to invalid target:%s{Util.nl}"
-                      + $"%s{PrettyPrinter.prettyPrint lhs}")
+            failwith (
+                $"BUG: assignment to invalid target:%s{Util.nl}"
+                + $"%s{PrettyPrinter.prettyPrint lhs}"
+            )
 
     | While(cond, body) ->
         /// Label to mark the beginning of the 'while' loop
@@ -707,23 +762,20 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         // address --- and this can be important if the compilation of 'body'
         // produces a large amount of assembly code
         Asm(RV.LABEL(whileBeginLabel))
-            ++ (doCodegen env cond)
-                .AddText([
-                    (RV.BNEZ(Reg.r(env.Target), whileBodyBeginLabel),
-                     "Jump to loop body if 'while' condition is true")
-                    (RV.LA(Reg.r(env.Target), whileEndLabel),
-                     "Load address of label at the end of the 'while' loop")
-                    (RV.JR(Reg.r(env.Target)), "Jump to the end of the loop")
-                    (RV.LABEL(whileBodyBeginLabel),
-                     "Body of the 'while' loop starts here")
-                ])
-            ++ (doCodegen env body)
-            .AddText([
-                (RV.LA(Reg.r(env.Target), whileBeginLabel),
-                 "Load address of label at the beginning of the 'while' loop")
-                (RV.JR(Reg.r(env.Target)), "Jump to the end of the loop")
-                (RV.LABEL(whileEndLabel), "")
-            ])
+        ++ (doCodegen env cond)
+            .AddText(
+                [ (RV.BNEZ(Reg.r (env.Target), whileBodyBeginLabel), "Jump to loop body if 'while' condition is true")
+                  (RV.LA(Reg.r (env.Target), whileEndLabel), "Load address of label at the end of the 'while' loop")
+                  (RV.JR(Reg.r (env.Target)), "Jump to the end of the loop")
+                  (RV.LABEL(whileBodyBeginLabel), "Body of the 'while' loop starts here") ]
+            )
+        ++ (doCodegen env body)
+            .AddText(
+                [ (RV.LA(Reg.r (env.Target), whileBeginLabel),
+                   "Load address of label at the beginning of the 'while' loop")
+                  (RV.JR(Reg.r (env.Target)), "Jump to the end of the loop")
+                  (RV.LABEL(whileEndLabel), "") ]
+            )
 
     | Lambda(args, body) ->
         /// Label to mark the position of the lambda term body
@@ -739,17 +791,17 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
 
         /// Compiled function body
         let bodyCode = compileFunction argNamesTypes body env
-        
+
         /// Compiled function code where the function label is located just
         /// before the 'bodyCode', and everything is placed at the end of the
         /// text segment (i.e. in the "PostText")
         let funCode =
-            (Asm(RV.LABEL(funLabel), "Lambda term (i.e. function instance) code")
-                ++ bodyCode).TextToPostText // Move to the end of text segment
+            (Asm(RV.LABEL(funLabel), "Lambda term (i.e. function instance) code") ++ bodyCode)
+                .TextToPostText // Move to the end of text segment
 
         // Finally, load the function address (label) in the target register
-        Asm(RV.LA(Reg.r(env.Target), funLabel), "Load lambda function address")
-            ++ funCode
+        Asm(RV.LA(Reg.r (env.Target), funLabel), "Load lambda function address")
+        ++ funCode
 
     | Application(expr, args) ->
         /// Integer registers to be saved on the stack before executing the
@@ -758,9 +810,13 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         /// Note: the definition of 'saveRegs' uses list comprehension:
         /// https://en.wikibooks.org/wiki/F_Sharp_Programming/Lists#Using_List_Comprehensions
         let saveRegs =
-            List.except [Reg.r(env.Target)]
-                        (Reg.ra :: [for i in 0u..7u do yield Reg.a(i)]
-                         @ [for i in 0u..6u do yield Reg.t(i)])
+            List.except
+                [ Reg.r (env.Target) ]
+                (Reg.ra
+                 :: [ for i in 0u .. 7u do
+                          yield Reg.a (i) ]
+                 @ [ for i in 0u .. 6u do
+                         yield Reg.t (i) ])
 
         /// Assembly code for the expression being applied as a function
         let appTermCode =
@@ -771,10 +827,16 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         /// (above the current target register) to determine the target register
         /// for compiling each expression.
         let indexedArgs = List.indexed args
+
         /// Function that compiles an argument (using its index to determine its
         /// target register) and accumulates the generated assembly code
         let compileArg (acc: Asm) (i, arg) =
-            acc ++ (doCodegen {env with Target = env.Target + (uint i) + 1u} arg)
+            acc
+            ++ (doCodegen
+                    { env with
+                        Target = env.Target + (uint i) + 1u }
+                    arg)
+
         /// Assembly code of all application arguments, obtained by folding over
         /// 'indexedArgs'
         let argsCode = List.fold compileArg (Asm()) indexedArgs
@@ -784,35 +846,34 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         /// index to determine the source and target registers, and accumulating
         /// the generated assembly code
         let copyArg (acc: Asm) (i: int) =
-            acc.AddText(RV.MV(Reg.a(uint i), Reg.r(env.Target + (uint i) + 1u)),
-                        $"Load function call argument %d{i+1}")
+            acc.AddText(
+                RV.MV(Reg.a (uint i), Reg.r (env.Target + (uint i) + 1u)),
+                $"Load function call argument %d{i + 1}"
+            )
 
         /// Code that loads each application argument into a register 'a', by
         /// copying the contents of the target registers used by 'compileArgs'
         /// and 'argsCode' above.  To this end, this code folds over the indexes
         /// of all arguments (from 0 to args.Length), using 'copyArg' above.
-        let argsLoadCode = List.fold copyArg (Asm()) [0..(args.Length-1)]
+        let argsLoadCode = List.fold copyArg (Asm()) [ 0 .. (args.Length - 1) ]
 
         /// Code that performs the function call
         let callCode =
             appTermCode
             ++ argsCode // Code to compute each argument of the function call
-               .AddText(RV.COMMENT("Before function call: save caller-saved registers"))
-               ++ (saveRegisters saveRegs [])
-               ++ argsLoadCode // Code to load arg values into arg registers
-                  .AddText(RV.JALR(Reg.ra, Imm12(0), Reg.r(env.Target)), "Function call")
+                .AddText(RV.COMMENT("Before function call: save caller-saved registers"))
+            ++ (saveRegisters saveRegs [])
+            ++ argsLoadCode // Code to load arg values into arg registers
+                .AddText(RV.JALR(Reg.ra, Imm12(0), Reg.r (env.Target)), "Function call")
 
         /// Code that handles the function return value (if any)
         let retCode =
-            Asm(RV.MV(Reg.r(env.Target), Reg.a0),
-                $"Copy function return value to target register")
+            Asm(RV.MV(Reg.r (env.Target), Reg.a0), $"Copy function return value to target register")
 
         // Put everything together, and restore the caller-saved registers
-        callCode
-            .AddText(RV.COMMENT("After function call"))
-            ++ retCode
-            .AddText(RV.COMMENT("Restore caller-saved registers"))
-                  ++ (restoreRegisters saveRegs [])
+        callCode.AddText(RV.COMMENT("After function call"))
+        ++ retCode.AddText(RV.COMMENT("Restore caller-saved registers"))
+        ++ (restoreRegisters saveRegs [])
 
     | StructCons(fields) ->
         // To compile a structure constructor, we allocate heap space for the
@@ -822,51 +883,54 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         // the register will contain a pointer to the first element of the
         // allocated structure
         let (fieldNames, fieldInitNodes) = List.unzip fields
+
         /// Generate the code that initialises a struct field, and accumulates
         /// the result.  This function is folded over all indexed struct fields,
         /// to produce the assembly code that initialises all fields.
-        let folder = fun (acc: Asm) (fieldOffset: int, fieldInit: TypedAST) ->
-            /// Code that initialises a single struct field.  Each field init
-            /// result is compiled by targeting the register (target+1u),
-            /// because the 'target' register holds the base memory address of
-            /// the struct.  After the init result for a field is computed, we
-            /// copy it into its heap location, by adding the field offset
-            /// (multiplied by 4, i.e. the word size) to the base struct address
-            let fieldInitCode: Asm =
-                match fieldInit.Type with
-                | t when (isSubtypeOf fieldInit.Env t TUnit) ->
-                    Asm() // Nothing to do
-                | t when (isSubtypeOf fieldInit.Env t TFloat) ->
-                    Asm(RV.FSW_S(FPReg.r(env.FPTarget), Imm12(fieldOffset * 4),
-                                 Reg.r(env.Target)),
-                        $"Initialize struct field '%s{fieldNames.[fieldOffset]}'")
-                | _ ->
-                    Asm(RV.SW(Reg.r(env.Target + 1u), Imm12(fieldOffset * 4),
-                              Reg.r(env.Target)),
-                        $"Initialize struct field '%s{fieldNames.[fieldOffset]}'")
-            acc ++ (doCodegen {env with Target = env.Target + 1u} fieldInit)
+        let folder =
+            fun (acc: Asm) (fieldOffset: int, fieldInit: TypedAST) ->
+                /// Code that initialises a single struct field.  Each field init
+                /// result is compiled by targeting the register (target+1u),
+                /// because the 'target' register holds the base memory address of
+                /// the struct.  After the init result for a field is computed, we
+                /// copy it into its heap location, by adding the field offset
+                /// (multiplied by 4, i.e. the word size) to the base struct address
+                let fieldInitCode: Asm =
+                    match fieldInit.Type with
+                    | t when (isSubtypeOf fieldInit.Env t TUnit) -> Asm() // Nothing to do
+                    | t when (isSubtypeOf fieldInit.Env t TFloat) ->
+                        Asm(
+                            RV.FSW_S(FPReg.r (env.FPTarget), Imm12(fieldOffset * 4), Reg.r (env.Target)),
+                            $"Initialize struct field '%s{fieldNames.[fieldOffset]}'"
+                        )
+                    | _ ->
+                        Asm(
+                            RV.SW(Reg.r (env.Target + 1u), Imm12(fieldOffset * 4), Reg.r (env.Target)),
+                            $"Initialize struct field '%s{fieldNames.[fieldOffset]}'"
+                        )
+
+                acc
+                ++ (doCodegen { env with Target = env.Target + 1u } fieldInit)
                 ++ fieldInitCode
+
         /// Assembly code for initialising each field of the struct, by folding
         /// the 'folder' function above over all indexed struct fields (we use
         /// the index to know the offset of a field from the beginning of the
         /// struct)
-        let fieldsInitCode =
-            List.fold folder (Asm()) (List.indexed fieldInitNodes)
+        let fieldsInitCode = List.fold folder (Asm()) (List.indexed fieldInitNodes)
 
         /// Assembly code that allocates space on the heap for the new
         /// structure, through an 'Sbrk' system call.  The size of the structure
         /// is computed by multiplying the number of fields by the word size (4)
         let structAllocCode =
-            (beforeSysCall [Reg.a0] [])
-                .AddText([
-                    (RV.LI(Reg.a0, fields.Length * 4),
-                     "Amount of memory to allocate for a struct (in bytes)")
-                    (RV.LI(Reg.a7, 9), "RARS syscall: Sbrk")
-                    (RV.ECALL, "")
-                    (RV.MV(Reg.r(env.Target), Reg.a0),
-                     "Move syscall result (struct mem address) to target")
-                ])
-                ++ (afterSysCall [Reg.a0] [])
+            (beforeSysCall [ Reg.a0 ] [])
+                .AddText(
+                    [ (RV.LI(Reg.a0, fields.Length * 4), "Amount of memory to allocate for a struct (in bytes)")
+                      (RV.LI(Reg.a7, 9), "RARS syscall: Sbrk")
+                      (RV.ECALL, "")
+                      (RV.MV(Reg.r (env.Target), Reg.a0), "Move syscall result (struct mem address) to target") ]
+                )
+            ++ (afterSysCall [ Reg.a0 ] [])
 
         // Put everything together: allocate heap space, init all struct fields
         structAllocCode ++ fieldsInitCode
@@ -880,6 +944,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
 
         /// Generated code for the target object whose field is being selected
         let selTargetCode = doCodegen env target
+
         /// Assembly code to access the struct field in memory (depending on the
         /// 'target' type) and leave its value in the target register
         let fieldAccessCode =
@@ -887,25 +952,25 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             | TStruct(fields) ->
                 let (fieldNames, fieldTypes) = List.unzip fields
                 let offset = List.findIndex (fun f -> f = field) fieldNames
+
                 match fieldTypes.[offset] with
-                | t when (isSubtypeOf node.Env t TUnit) ->
-                    Asm() // Nothing to do
+                | t when (isSubtypeOf node.Env t TUnit) -> Asm() // Nothing to do
                 | t when (isSubtypeOf node.Env t TFloat) ->
-                    Asm(RV.FLW_S(FPReg.r(env.FPTarget), Imm12(offset * 4),
-                                 Reg.r(env.Target)),
-                        $"Retrieve value of struct field '%s{field}'")
+                    Asm(
+                        RV.FLW_S(FPReg.r (env.FPTarget), Imm12(offset * 4), Reg.r (env.Target)),
+                        $"Retrieve value of struct field '%s{field}'"
+                    )
                 | _ ->
-                    Asm(RV.LW(Reg.r(env.Target), Imm12(offset * 4),
-                              Reg.r(env.Target)),
-                        $"Retrieve value of struct field '%s{field}'")
-            | t ->
-                failwith $"BUG: FieldSelect codegen on invalid target type: %O{t}"
+                    Asm(
+                        RV.LW(Reg.r (env.Target), Imm12(offset * 4), Reg.r (env.Target)),
+                        $"Retrieve value of struct field '%s{field}'"
+                    )
+            | t -> failwith $"BUG: FieldSelect codegen on invalid target type: %O{t}"
 
         // Put everything together: compile the target, access the field
         selTargetCode ++ fieldAccessCode
 
-    | Pointer(_) ->
-        failwith "BUG: pointers cannot be compiled (by design!)"
+    | Pointer(_) -> failwith "BUG: pointers cannot be compiled (by design!)"
 
     | UnionCons(label, expr) -> failwith "todo"
     | Match(expr, cases) -> failwith "todo"
@@ -913,22 +978,26 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
 /// Generate code to save the given registers on the stack, before a RARS system
 /// call. Register a7 (which holds the system call number) is backed-up by
 /// default, so it does not need to be specified when calling this function.
-and internal beforeSysCall (regs: List<Reg>) (fpregs: List<FPReg>): Asm =
+and internal beforeSysCall (regs: List<Reg>) (fpregs: List<FPReg>) : Asm =
     Asm(RV.COMMENT("Before system call: save registers"))
-        ++ (saveRegisters (Reg.a7 :: regs) fpregs)
+    ++ (saveRegisters (Reg.a7 :: regs) fpregs)
 
 /// Generate code to restore the given registers from the stack, after a RARS
 /// system call. Register a7 (which holds the system call number) is restored
 /// by default, so it does not need to be specified when calling this function.
-and internal afterSysCall (regs: List<Reg>) (fpregs: List<FPReg>): Asm =
+and internal afterSysCall (regs: List<Reg>) (fpregs: List<FPReg>) : Asm =
     Asm(RV.COMMENT("After system call: restore registers"))
-        ++ (restoreRegisters (Reg.a7 :: regs) fpregs)
+    ++ (restoreRegisters (Reg.a7 :: regs) fpregs)
+
+and internal compileSysCall (definition: Syscalls.Definition) : Asm = failwith "not implemented"
 
 /// Generate code to save the given lists of registers by using increasing
 /// offsets from the stack pointer register (sp).
-and internal saveRegisters (rs: List<Reg>) (fprs: List<FPReg>): Asm =
+and internal saveRegisters (rs: List<Reg>) (fprs: List<FPReg>) : Asm =
     /// Generate code to save standard registers by folding over indexed 'rs'
-    let regSave (asm: Asm) (i, r) = asm.AddText(RV.SW(r, Imm12(i * 4), Reg.sp))
+    let regSave (asm: Asm) (i, r) =
+        asm.AddText(RV.SW(r, Imm12(i * 4), Reg.sp))
+
     /// Code to save standard registers
     let rsSaveAsm = List.fold regSave (Asm()) (List.indexed rs)
 
@@ -938,19 +1007,24 @@ and internal saveRegisters (rs: List<Reg>) (fprs: List<FPReg>): Asm =
     /// stack locations are already used to save 'rs' above.
     let fpRegSave (asm: Asm) (i, r) =
         asm.AddText(RV.FSW_S(r, Imm12((i + rs.Length) * 4), Reg.sp))
+
     /// Code to save both standard and floating point registers
     let regSaveCode = List.fold fpRegSave rsSaveAsm (List.indexed fprs)
 
     // Put everything together: update the stack pointer and save the registers
-    Asm(RV.ADDI(Reg.sp, Reg.sp, Imm12(-4 * (rs.Length + fprs.Length))),
-        "Update stack pointer to make room for saved registers")
-      ++ regSaveCode
+    Asm(
+        RV.ADDI(Reg.sp, Reg.sp, Imm12(-4 * (rs.Length + fprs.Length))),
+        "Update stack pointer to make room for saved registers"
+    )
+    ++ regSaveCode
 
 /// Generate code to restore the given lists of registers, that are assumed to
 /// be saved with increasing offsets from the stack pointer register (sp)
-and internal restoreRegisters (rs: List<Reg>) (fprs: List<FPReg>): Asm =
+and internal restoreRegisters (rs: List<Reg>) (fprs: List<FPReg>) : Asm =
     /// Generate code to restore standard registers by folding over indexed 'rs'
-    let regLoad (asm: Asm) (i, r) = asm.AddText(RV.LW(r, Imm12(i * 4), Reg.sp))
+    let regLoad (asm: Asm) (i, r) =
+        asm.AddText(RV.LW(r, Imm12(i * 4), Reg.sp))
+
     /// Code to restore standard registers
     let rsLoadAsm = List.fold regLoad (Asm()) (List.indexed rs)
 
@@ -960,29 +1034,31 @@ and internal restoreRegisters (rs: List<Reg>) (fprs: List<FPReg>): Asm =
     /// since those stack locations are already used to save 'rs' above.
     let fpRegLoad (asm: Asm) (i, r) =
         asm.AddText(RV.FLW_S(r, Imm12((i + rs.Length) * 4), Reg.sp))
+
     /// Code to restore both standard and floating point registers
     let regRestoreCode = List.fold fpRegLoad rsLoadAsm (List.indexed fprs)
 
     // Put everything together: restore the registers and then the stack pointer
-    regRestoreCode
-        .AddText(RV.ADDI(Reg.sp, Reg.sp, Imm12(4 * (rs.Length + fprs.Length))),
-                 "Restore stack pointer after register restoration")
+    regRestoreCode.AddText(
+        RV.ADDI(Reg.sp, Reg.sp, Imm12(4 * (rs.Length + fprs.Length))),
+        "Restore stack pointer after register restoration"
+    )
 
 /// Compile a function instance with the given (optional) name, arguments, and
 /// body, and using the given environment.  This function places all the
 /// assembly code it generates in the Text segment (hence, this code may need
 /// to be moved afterwards).
-and internal compileFunction (args: List<string * Type>)
-                             (body: TypedAST)
-                             (env: CodegenEnv): Asm =
+and internal compileFunction (args: List<string * Type>) (body: TypedAST) (env: CodegenEnv) : Asm =
     /// List of indexed arguments: we use the index as the number of the 'a'
     /// register that holds the argument
     let indexedArgs = List.indexed args
+
     /// Folder function that assigns storage information to function arguments:
     /// it assigns an 'a' register to each function argument, and accumulates
     /// the result in a mapping (that will be used as env.VarStorage)
     let folder (acc: Map<string, Storage>) (i, (var, _tpe)) =
-        acc.Add(var, Storage.Reg(Reg.a((uint)i)))
+        acc.Add(var, Storage.Reg(Reg.a ((uint) i)))
+
     /// Updated storage information including function arguments
     let varStorage2 = List.fold folder env.VarStorage indexedArgs
 
@@ -994,41 +1070,48 @@ and internal compileFunction (args: List<string * Type>)
     /// ends, we need to move that result into the function return value
     /// register 'a0' or 'fa0'.
     let bodyCode =
-        let env = {Target = 0u; FPTarget = 0u; VarStorage = varStorage2}
+        let env =
+            { Target = 0u
+              FPTarget = 0u
+              VarStorage = varStorage2 }
+
         doCodegen env body
+
     /// Code to move the body result into the function return value register
     let returnCode =
-        Asm(RV.MV(Reg.a0, Reg.r(0u)),
-            "Move result of function into return value register")
+        Asm(RV.MV(Reg.a0, Reg.r (0u)), "Move result of function into return value register")
 
     /// Integer registers to save before executing the function body.
     /// Note: the definition of 'saveRegs' uses list comprehension:
     /// https://en.wikibooks.org/wiki/F_Sharp_Programming/Lists#Using_List_Comprehensions
-    let saveRegs = [for i in 0u..11u do yield Reg.s(i)]
+    let saveRegs =
+        [ for i in 0u .. 11u do
+              yield Reg.s (i) ]
 
     // Finally, we put together the full code for the function
     Asm(RV.COMMENT("Funtion prologue begins here"))
-            .AddText(RV.COMMENT("Save callee-saved registers"))
-        ++ (saveRegisters saveRegs [])
-            .AddText(RV.ADDI(Reg.fp, Reg.sp, Imm12(saveRegs.Length * 4)),
-                     "Update frame pointer for the current function")
-            .AddText(RV.COMMENT("End of function prologue.  Function body begins"))
-        ++ bodyCode
-            .AddText(RV.COMMENT("End of function body.  Function epilogue begins"))
-        ++ returnCode
-            .AddText(RV.COMMENT("Restore callee-saved registers"))
-            ++ (restoreRegisters saveRegs [])
-                .AddText(RV.JR(Reg.ra), "End of function, return to caller")
+        .AddText(RV.COMMENT("Save callee-saved registers"))
+    ++ (saveRegisters saveRegs [])
+        .AddText(RV.ADDI(Reg.fp, Reg.sp, Imm12(saveRegs.Length * 4)), "Update frame pointer for the current function")
+        .AddText(RV.COMMENT("End of function prologue.  Function body begins"))
+    ++ bodyCode.AddText(RV.COMMENT("End of function body.  Function epilogue begins"))
+    ++ returnCode.AddText(RV.COMMENT("Restore callee-saved registers"))
+    ++ (restoreRegisters saveRegs [])
+        .AddText(RV.JR(Reg.ra), "End of function, return to caller")
 
 
 /// Generate RISC-V assembly for the given AST.
-let codegen (node: TypedAST): RISCV.Asm =
+let codegen (node: TypedAST) : RISCV.Asm =
     /// Initial codegen environment, targeting generic registers 0 and without
     /// any variable in the storage map
-    let env = {Target = 0u; FPTarget = 0u; VarStorage =  Map[]}
+    let env =
+        { Target = 0u
+          FPTarget = 0u
+          VarStorage = Map [] }
+
     Asm(RV.MV(Reg.fp, Reg.sp), "Initialize frame pointer")
     ++ (doCodegen env node)
-        .AddText([
-            (RV.LI(Reg.a7, 10), "RARS syscall: Exit")
-            (RV.ECALL, "Successful exit with code 0")
-        ])
+        .AddText(
+            [ (RV.LI(Reg.a7, 10), "RARS syscall: Exit")
+              (RV.ECALL, "Successful exit with code 0") ]
+        )
