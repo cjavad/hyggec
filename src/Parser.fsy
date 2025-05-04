@@ -48,8 +48,7 @@ let mkNode (parseState: IParseState, inputIdx: int, e: UntypedExpr): UntypedAST 
 %token <unit> LIT_UNIT
 
 // Tokens for arithmetic operators and other functions
-%token SQRT
-%token REM DIV TIMES PLUS MINUS
+%token SQRT REM DIV TIMES PLUS MINUS
 
 // Tokens for logical operators
 %token AND SCAND OR SCOR XOR NOT

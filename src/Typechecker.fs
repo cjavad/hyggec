@@ -340,7 +340,10 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
     | Rem(lhs, rhs) ->
         match (binaryNumericalOpTyper "remainder" node.Pos env lhs rhs) with
         | Ok(tpe, tlhs, trhs) ->
-            Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = Rem(tlhs, trhs) }
+            match tpe with
+            | TInt ->
+                Ok { Pos = node.Pos; Env = env; Type = tpe; Expr = Rem(tlhs, trhs) }
+            | t -> Error([(node.Pos, $"remainder: expected argument of type %O{TInt}, " + $"found %O{t}")])
         | Error(es) -> Error(es)
     | Sqrt(arg) ->
         match (typer env arg) with
