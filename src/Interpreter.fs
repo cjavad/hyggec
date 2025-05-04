@@ -387,6 +387,11 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
                     Some(env', n)
             | _ -> failwith $"BUG: unexpected 'Print' reduction ${n}"
         | None -> None
+     
+    | Syscall(num, args) ->
+        // We do not support system calls in the interpreter
+        failwith "not implemented"
+     
     
     | Preinc(arg) ->
         match (arg) with

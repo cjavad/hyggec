@@ -1,0 +1,3 @@
+let x = 1;
+let f = syscall(6);
+syscall(2, f)
