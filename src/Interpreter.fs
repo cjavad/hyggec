@@ -210,13 +210,19 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             | Some(env', lhs', rhs') -> Some(env', { node with Expr = And(lhs', rhs') })
             | None -> None
 
-    | SCAnd(lhs, rhs) ->
-        match (lhs.Expr, rhs.Expr) with
-        | (BoolVal(v1), BoolVal(v2)) when v1 -> Some(env, { node with Expr = BoolVal(v1 && v2)})
-        | (BoolVal(v1), BoolVal(v2)) -> Some(env, { node with Expr = BoolVal(false) })
-        | (_, _) ->
+    | ScAnd(lhs, rhs) ->
+        match lhs.Expr with
+        | BoolVal false -> Some(env, { node with Expr = BoolVal false })
+        | BoolVal true ->
+            match rhs.Expr with
+            | BoolVal v -> Some(env, { node with Expr = BoolVal(v) })
+            | _ ->
+                match (reduceLhsRhs env lhs rhs) with
+                | Some(env', lhs', rhs') -> Some(env', { node with Expr = ScAnd(lhs', rhs') })
+                | None -> None
+        | _ ->
             match (reduceLhsRhs env lhs rhs) with
-            | Some(env', lhs', rhs') -> Some(env', { node with Expr = SCAnd(lhs', rhs') })
+            | Some(env', lhs', rhs') -> Some(env', { node with Expr = ScAnd(lhs', rhs') })
             | None -> None
 
     | Or(lhs, rhs) ->
@@ -227,14 +233,21 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             | Some(env', lhs', rhs') -> Some(env', { node with Expr = Or(lhs', rhs') })
             | None -> None
 
-    | SCOr(lhs, rhs) ->
-        match (lhs.Expr, rhs.Expr) with
-        | (BoolVal(v1), BoolVal(v2)) when v1 -> Some(env, { node with Expr = BoolVal(true) })
-        | (BoolVal(v1), BoolVal(v2)) -> Some(env, { node with Expr = BoolVal(v1 || v2) })
-        | (_, _) ->
+    | ScOr(lhs, rhs) ->
+        match lhs.Expr with
+        | BoolVal true -> Some(env, { node with Expr = BoolVal true })
+        | BoolVal false ->
+            match rhs.Expr with
+            | BoolVal v -> Some(env, { node with Expr = BoolVal(v) })
+            | _ ->
+                match (reduceLhsRhs env lhs rhs) with
+                | Some(env', lhs', rhs') -> Some(env', { node with Expr = ScOr(lhs', rhs') })
+                | None -> None
+        | _ ->
             match (reduceLhsRhs env lhs rhs) with
-            | Some(env', lhs', rhs') -> Some(env', { node with Expr = SCOr(lhs', rhs') })
+            | Some(env', lhs', rhs') -> Some(env', { node with Expr = ScOr(lhs', rhs') })
             | None -> None
+
     
     | Xor(lhs, rhs) ->
         match (lhs.Expr, rhs.Expr) with

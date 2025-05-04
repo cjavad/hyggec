@@ -166,27 +166,28 @@ ifExpr:
 
 // Logical 'or' expression
 orExpr:
-  | orExpr OR scorExpr  { mkNode(parseState, 2, Expr.Or($1, $3)) }
-  | scorExpr            { $1 }
+  | orExpr OR SCorExpr  { mkNode(parseState, 2, Expr.Or($1, $3)) }
+  | SCorExpr            { $1 }
 
-// Logical short-curcuit 'or' expression
-scorExpr:
-  | scorExpr SCOR xorExpr  { mkNode(parseState, 2, Expr.Or($1, $3)) }
-  | xorExpr                { $1 }
+// Logical 'or' expression
+SCorExpr:
+  | SCorExpr SCOR xorExpr  { mkNode(parseState, 2, Expr.ScOr($1, $3)) }
+  | xorExpr            { $1 }
 
 // Logical 'xor' expression
 xorExpr:
-  | xorExpr XOR scandExpr { mkNode(parseState, 2, Expr.Xor($1, $3)) }
-  | scandExpr             { $1 }
+  | xorExpr XOR andExpr { mkNode(parseState, 2, Expr.Xor($1, $3)) }
+  | andExpr             { $1 }
 
-// Logical 'and' expression
-scandExpr:
-  | scandExpr SCAND andExpr  { mkNode(parseState, 2, Expr.And($1, $3)) }
-  | andExpr                  { $1 }
 
 // Logical 'and' expression
 andExpr:
-  | andExpr AND relExpr  { mkNode(parseState, 2, Expr.And($1, $3)) }
+  | andExpr AND SCandExpr  { mkNode(parseState, 2, Expr.And($1, $3)) }
+  | SCandExpr              { $1 }
+
+// Logical 'and' expression
+SCandExpr:
+  | SCandExpr SCAND relExpr  { mkNode(parseState, 2, Expr.ScAnd($1, $3)) }
   | relExpr              { $1 }
 
 // Relational expression
