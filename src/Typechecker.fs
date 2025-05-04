@@ -501,7 +501,7 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
         | Ok(targ) when (isSubtypeOf env Set.empty targ.Type TFloat) ->
             Ok {Pos = node.Pos; Env = env; Type = TFloat; Expr = Preinc(targ)}
         | Ok(targ) ->
-            Error([(node.Pos, $"Increment: expected type %O{TInt}, "
+            Error([(node.Pos, $"Increment: expected type %O{TInt} or %O{TFloat}, "
                               + $"found %O{targ.Type}")])
         | Error(es) -> Error(es)
         
@@ -512,7 +512,7 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
         | Ok(targ) when (isSubtypeOf env Set.empty targ.Type TFloat) ->
             Ok {Pos = node.Pos; Env = env; Type = TFloat; Expr = Postinc(targ)}
         | Ok(targ) ->
-            Error([(node.Pos, $"Increment: expected type %O{TInt}, "
+            Error([(node.Pos, $"Increment: expected type %O{TInt} or %O{TFloat}, "
                               + $"found %O{targ.Type}")])
         | Error(es) -> Error(es) 
 
