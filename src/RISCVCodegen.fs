@@ -220,9 +220,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
 
         lAsm ++ rAsm ++ opAsm
     | And(lhs, rhs)
+    | ScAnd(lhs,rhs)
     | Xor(lhs, rhs)
-    | SCAnd(lhs, rhs)
-    | SCOr(lhs, rhs)
+    | ScOr(lhs, rhs)
     | Or(lhs, rhs) as expr ->
         // Code generation for logical 'and' and 'or' is very similar: we
         // compile the lhs and rhs giving them different target registers, and
@@ -239,14 +239,40 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             match expr with
             | And(_,_) ->
                 Asm(RV.AND(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | ScAnd(_,_) ->
+                let falseLabel = Util.genSymbol "scand_false"
+                let endLabel = Util.genSymbol "scand_end"
+                let lhsAsm = doCodegen env lhs
+                let rhsAsm = doCodegen env rhs
+
+                lhsAsm ++
+                Asm(RV.BEQ(Reg.r(env.Target), Reg.zero, falseLabel)) ++
+                rhsAsm ++
+                Asm(RV.BEQ(Reg.r(env.Target), Reg.zero, falseLabel)) ++
+                Asm(RV.LI(Reg.r(env.Target), 1)) ++
+                Asm(RV.J(endLabel)) ++
+                Asm(RV.LABEL falseLabel) ++
+                Asm(RV.LI(Reg.r(env.Target), 0)) ++
+                Asm(RV.LABEL endLabel)
             | Or(_,_) ->
                 Asm(RV.OR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | ScOr(_,_) ->
+                let trueLabel = Util.genSymbol "scor_true"
+                let endLabel = Util.genSymbol "scor_end"
+                let lhsAsm = doCodegen env lhs
+                let rhsAsm = doCodegen env rhs
+
+                lhsAsm ++
+                Asm(RV.BNE(Reg.r(env.Target), Reg.zero, trueLabel)) ++
+                rhsAsm ++
+                Asm(RV.BNE(Reg.r(env.Target), Reg.zero, trueLabel)) ++
+                Asm(RV.LI(Reg.r(env.Target), 0)) ++
+                Asm(RV.J(endLabel)) ++
+                Asm(RV.LABEL trueLabel) ++
+                Asm(RV.LI(Reg.r(env.Target), 1)) ++
+                Asm(RV.LABEL endLabel)
             | Xor(_,_) ->
                 Asm(RV.XOR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
-            | SCAnd(_,_) ->
-                Asm(RV.AND(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
-            | SCOr(_,_) -> 
-                Asm(RV.OR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
             | x -> failwith $"BUG: unexpected operation %O{x}"
         // Put everything together
         lAsm ++ rAsm ++ opAsm

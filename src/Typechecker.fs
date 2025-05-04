@@ -293,10 +293,10 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
             Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = And(tlhs, trhs) }
         | Error(es) -> Error(es)
 
-    | SCAnd(lhs, rhs) ->
-        match (binaryBooleanOpTyper "and" node.Pos env lhs rhs) with
+    | ScAnd(lhs, rhs) ->
+        match (binaryBooleanOpTyper "scand" node.Pos env lhs rhs) with
         | Ok(tlhs, trhs) ->
-            Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = SCAnd(tlhs, trhs) }
+            Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = ScAnd(tlhs, trhs) }
         | Error(es) -> Error(es)
 
     | Or(lhs, rhs) ->
@@ -305,10 +305,10 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
             Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = Or(tlhs, trhs) }
         | Error(es) -> Error(es)
 
-    | SCOr(lhs, rhs) ->
-        match (binaryBooleanOpTyper "or" node.Pos env lhs rhs) with
+    | ScOr(lhs, rhs) ->
+        match (binaryBooleanOpTyper "scor" node.Pos env lhs rhs) with
         | Ok(tlhs, trhs) ->
-            Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = SCOr(tlhs, trhs) }
+            Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = ScOr(tlhs, trhs) }
         | Error(es) -> Error(es)
 
     | Xor(lhs, rhs) ->
