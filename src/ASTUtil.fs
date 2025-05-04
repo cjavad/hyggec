@@ -37,12 +37,12 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = Rem((subst lhs var sub), (subst rhs var sub))}
     | And(lhs, rhs) ->
         {node with Expr = And((subst lhs var sub), (subst rhs var sub))}
-    | SCAnd(lhs, rhs) ->
-        {node with Expr = SCAnd((subst lhs var sub), (subst rhs var sub))}
+    | ScAnd(lhs, rhs) ->
+        {node with Expr = And((subst lhs var sub), (subst rhs var sub))}
     | Or(lhs, rhs) ->
         {node with Expr = Or((subst lhs var sub), (subst rhs var sub))}
-    | SCOr(lhs, rhs) ->
-        {node with Expr = SCOr((subst lhs var sub), (subst rhs var sub))}
+    | ScOr(lhs, rhs) ->
+        {node with Expr = Or((subst lhs var sub), (subst rhs var sub))}
     | Xor(lhs, rhs) ->
         {node with Expr = Xor((subst lhs var sub), (subst rhs var sub))}
     | Not(arg) ->
@@ -164,9 +164,9 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
     | Rem(lhs, rhs) 
     | Sub(lhs, rhs)
     | And(lhs, rhs)
-    | SCAnd(lhs, rhs)
+    | ScAnd(lhs, rhs)
     | Xor(lhs, rhs)
-    | SCOr(lhs, rhs)
+    | ScOr(lhs, rhs)
     | Or(lhs, rhs) ->
         Set.union (freeVars lhs) (freeVars rhs)
     | Not(arg) -> freeVars arg
@@ -254,9 +254,9 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         Set.union (capturedVars lhs) (capturedVars rhs)
     | Rem(lhs, rhs) 
     | And(lhs, rhs)
-    | SCAnd(lhs, rhs)
+    | ScAnd(lhs, rhs)
     | Xor(lhs, rhs)
-    | SCOr(lhs, rhs)
+    | ScOr(lhs, rhs)
     | Or(lhs, rhs) ->
         Set.union (capturedVars lhs) (capturedVars rhs)
     | Not(arg) -> capturedVars arg
