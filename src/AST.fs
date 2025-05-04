@@ -254,6 +254,9 @@ and Expr<'E, 'T> =
     /// and a continuation expression (that can use that variable to access the
     /// match case value).
     | Match of expr: Node<'E, 'T> * cases: List<string * string * Node<'E, 'T>>
+    | Array of length: Node<'E, 'T> * data: Node<'E, 'T>
+    | ArrayLength of target: Node<'E, 'T>
+    | ArrayElem of target: Node<'E, 'T> * index: Node<'E, 'T>
 
 
 /// A type alias for an untyped AST, where there is no typing environment nor

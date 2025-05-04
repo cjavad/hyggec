@@ -1073,7 +1073,7 @@ and internal syscallTyper
                     [ (pos,
                        $"%s{syscallFormatName Platform.RARS number}: expected %d{targs.Length} arguments, found %d{argTypes.Length}") ]
                 )            
-            elif List.forall2 (fun t1 t2 -> isSubtypeOf env t1 t2) argTypes targs then
+            elif List.forall2 (fun t1 t2 -> isSubtypeOf env Set.empty t1 t2) argTypes targs then
                 Ok(tret, typedArgs)
             else
                 Error(
