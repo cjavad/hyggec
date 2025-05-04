@@ -50,6 +50,11 @@ type internal Heap<'E, 'T> = Map<uint, Node<'E, 'T>>
 /// Runtime environment for the interpreter.  The type parameters have the same
 /// meaning of the corresponding ones in AST.Node<'E,'T>: they allow the
 /// environment to hold generic instances of AST.Node<'E,'T>.
+
+type internal hInfo = 
+    | StructFields of string list
+    | Arraylen of uint
+
 type internal RuntimeEnv<'E, 'T> =
     {
         /// Function called to read a line when evaluating 'ReadInt' and 'ReadFloat'
@@ -64,7 +69,7 @@ type internal RuntimeEnv<'E, 'T> =
         Heap: Heap<'E, 'T>
         /// Pointer information, mapping memory addresses to lists of structure
         /// fields.
-        PtrInfo: Map<uint, List<string>>
+        PtrInfo: Map<uint, hInfo>
     }
 
     override this.ToString() : string =
@@ -80,8 +85,12 @@ type internal RuntimeEnv<'E, 'T> =
         let printFields fields =
             List.reduce (fun x y -> x + ", " + y) fields
 
-        let folder str addr fields =
-            str + $"      0x%x{addr}: [%s{printFields fields}]%s{Util.nl}"
+        let folder str addr choice =
+            match choice with
+            | StructFields fields ->
+                str + $"      0x%x{addr}: [%s{printFields fields}]%s{Util.nl}"
+            | Arraylen length ->
+                str + $"      0x%x{addr}: [array of length %d{length}%s{Util.nl}"
 
         let ptrInfoStr =
             if this.PtrInfo.IsEmpty then
@@ -543,6 +552,58 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             | None -> None
         | None -> None
 
+    | Array(size, init) ->
+        match (reduce env size, reduce env init) with
+        | (Some(env', size'), None) when isValue size' ->
+            Some(env', { node with Expr = Array(size', init) })
+        | (None, Some(env', init')) when isValue init' ->
+            Some(env', { node with Expr = Array(size, init') })
+        | (Some(env', size'), Some(env'', init')) ->
+            Some(env'', { node with Expr = Array(size', init') })
+        | (None, None) when isValue size && isValue init ->
+            match size.Expr with
+            | IntVal(n) when n >= 0 ->
+                let elements = List.replicate n init
+                let (heap', baseAddr) = heapAlloc env.Heap elements
+                let env' = {env with
+                                Heap = heap'
+                                PtrInfo = env.PtrInfo.Add(baseAddr, Arraylen (uint n))}
+                Some (env', { node with Expr = Pointer(baseAddr) })
+            | _ -> None
+        | _ -> None
+    | ArrayElem(arr, index) ->
+        match (reduce env arr, reduce env index) with
+        | (Some(env', arr'), None) ->
+            Some(env', { node with Expr = ArrayElem(arr', index) })
+        | (None, Some(env', index')) ->
+            Some(env', { node with Expr = ArrayElem(arr, index') })
+        | (Some(env', arr'), Some(env'', index')) ->
+            Some(env'', { node with Expr = ArrayElem(arr', index') })
+        | (None, None) when isValue arr && isValue index ->
+            match (arr.Expr, index.Expr) with
+            | (Pointer(addr), IntVal(i)) when i >= 0 ->
+                match env.PtrInfo.TryFind addr with
+                | Some(Arraylen length) when uint i < length ->
+                    match env.Heap.TryFind (addr + uint i) with
+                    | Some(value) -> Some(env, value)
+                    | _ -> None
+                | _ -> None
+            | _ -> None
+        | _ -> None
+    | ArrayLength(arr) ->
+        match (reduce env arr) with
+        | Some(env', arr') ->
+            Some(env', { node with Expr = ArrayLength(arr') })
+        | None when isValue arr ->
+            match arr.Expr with
+            | Pointer(addr) ->
+                match env.PtrInfo.TryFind addr with
+                | Some(Arraylen length) ->
+                    Some(env, { node with Expr = IntVal(int length) })
+                | _ -> None
+            | _ -> None
+        | _ -> None
+    
     | Assign({ Expr = FieldSelect(selTarget, field) } as target, expr) when not (isValue selTarget) ->
         match (reduce env selTarget) with
         | Some(env', selTarget') ->
@@ -567,7 +628,7 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
         | None -> None
     | Assign({ Expr = FieldSelect({ Expr = Pointer(addr) }, field) }, value) ->
         match (env.PtrInfo.TryFind addr) with
-        | Some(fields) ->
+        | Some(StructFields fields) ->
             match (List.tryFindIndex (fun f -> f = field) fields) with
             | Some(offset) ->
                 /// Updated env with selected struct field overwritten by 'value'
@@ -577,6 +638,7 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
 
                 Some(env', value)
             | None -> None
+        | Some(Arraylen _) -> failwith$"Runtime error: Field access on array: 0x%x{addr}"
         | None -> None
     | Assign(target, expr) when not (isValue expr) ->
         match (reduce env expr) with
@@ -596,6 +658,39 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
 
             Some(env', { node with Expr = expr.Expr })
         | None -> None
+    | Assign({ Expr = ArrayElem(arr,index) } as target, expr) when not (isValue arr) || not (isValue index) ->
+        match (reduce env arr, reduce env index) with
+        | (Some(env', arr'), None) ->
+            let target' =
+                { target with
+                    Expr = ArrayElem(arr', index) }
+            Some(env', { node with Expr = Assign(target', expr) })
+        | (None, Some(env', index')) ->
+            let target' =
+                { target with
+                    Expr = ArrayElem(arr, index') }
+            Some(env', { node with Expr = Assign(target', expr) })
+        | (Some(env', arr'), Some(env'', index')) ->
+            let target' =
+                { target with
+                    Expr = ArrayElem(arr', index') }
+            Some(env'', { node with Expr = Assign(target', expr) })
+        | _ -> None
+    | Assign({ Expr = ArrayElem(arr, index) }, expr) when not (isValue expr) ->
+        match (reduce env expr) with
+        | Some(env', expr') ->
+            Some(env', { node with Expr = Assign({ node with Expr = ArrayElem(arr, index) }, expr') })
+        | None -> None
+    | Assign({ Expr = ArrayElem(arr, index) }, expr) when isValue arr && isValue index && isValue expr ->
+        match (arr.Expr, index.Expr) with
+        | (Pointer(addr), IntVal(i)) when i >= 0 ->
+            match env.PtrInfo.TryFind addr with
+            | Some(Arraylen len) when uint i < len ->
+                let env' = { env with Heap = env.Heap.Add(addr + uint i, expr) }
+                Some(env', expr)
+            | _ -> None
+        | _ -> None
+    
     | Assign(_, _) -> None
 
     | While(cond, body) ->
@@ -664,7 +759,7 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
                 let (heap', baseAddr) = heapAlloc env.Heap fieldNodes
                 /// Updated pointer info, mapping 'baseAddr' to the list of
                 /// struct field names
-                let ptrInfo' = env.PtrInfo.Add(baseAddr, fieldNames)
+                let ptrInfo' = env.PtrInfo.Add(baseAddr, StructFields fieldNames)
 
                 Some(
                     { env with
@@ -677,10 +772,11 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
 
     | FieldSelect({ Expr = Pointer(addr) }, field) ->
         match (env.PtrInfo.TryFind addr) with
-        | Some(fields) ->
+        | Some(StructFields fields) ->
             match (List.tryFindIndex (fun f -> f = field) fields) with
             | Some(offset) -> Some(env, env.Heap[addr + (uint offset)])
             | None -> None
+        | Some(Arraylen _) -> failwith$"Runtime error: Field access on array: 0x%x{addr}"
         | None -> None
     | FieldSelect(target, field) when not (isValue target) ->
         match (reduce env target) with

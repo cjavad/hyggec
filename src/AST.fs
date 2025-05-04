@@ -32,7 +32,6 @@ type Position =
     member this.Format =
         $"(%d{this.LineStart}:%d{this.ColStart}-%d{this.LineEnd}:%d{this.ColEnd})"
 
-
 /// Node of the Abstract Syntex Tree of a 'pretype', i.e. something that
 /// syntactically looks like a Hygge type (found e.g. in type ascriptions).
 [<RequireQualifiedAccess>]
@@ -54,8 +53,9 @@ and Pretype =
     | TStruct of fields: List<string * PretypeNode>
     /// Discriminated union type.  Each case consists of a name and a pretype.
     | TUnion of cases: List<string * PretypeNode>
-
-
+    /// An array pretype, with pretypes for the elements WIP
+    | TArray of elements: PretypeNode
+    
 /// Node of the Abstract Syntax Tree of a Hygge expression.  The meaning of the
 /// two type arguments is the following: 'E specifies what typing environment
 /// information is associated to each expression in the AST; 'T specifies what
@@ -254,6 +254,9 @@ and Expr<'E, 'T> =
     /// and a continuation expression (that can use that variable to access the
     /// match case value).
     | Match of expr: Node<'E, 'T> * cases: List<string * string * Node<'E, 'T>>
+    | Array of length: Node<'E, 'T> * data: Node<'E, 'T>
+    | ArrayLength of target: Node<'E, 'T>
+    | ArrayElem of target: Node<'E, 'T> * index: Node<'E, 'T>
 
 
 /// A type alias for an untyped AST, where there is no typing environment nor
