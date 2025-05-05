@@ -243,40 +243,40 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             | ScAnd(_,_) ->
                 let falseLabel = Util.genSymbol "scand_false"
                 let endLabel = Util.genSymbol "scand_end"
-                let lhsAsm = doCodegen env lhs
-                let rhsAsm = doCodegen env rhs
-
-                lhsAsm ++
-                Asm(RV.BEQ(Reg.r(env.Target), Reg.zero, falseLabel)) ++
-                rhsAsm ++
-                Asm(RV.BEQ(Reg.r(env.Target), Reg.zero, falseLabel)) ++
-                Asm(RV.LI(Reg.r(env.Target), 1)) ++
-                Asm(RV.J(endLabel)) ++
-                Asm(RV.LABEL falseLabel) ++
-                Asm(RV.LI(Reg.r(env.Target), 0)) ++
-                Asm(RV.LABEL endLabel)
+                lAsm ++
+                Asm(RV.BEQ(Reg.r(env.Target), Reg.zero, falseLabel),"jump to false if lhs false") ++
+                rAsm ++
+                Asm([
+                    RV.MV(Reg.r(env.Target), Reg.r(rtarget)), "move rhs to target";
+                    RV.J(endLabel), "jump to end";
+                    RV.LABEL falseLabel, "false";
+                    RV.LI(Reg.r(env.Target), 0), "set register false";
+                    RV.LABEL endLabel, "end"
+                ])
             | Or(_,_) ->
                 Asm(RV.OR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
             | ScOr(_,_) ->
                 let trueLabel = Util.genSymbol "scor_true"
                 let endLabel = Util.genSymbol "scor_end"
-                let lhsAsm = doCodegen env lhs
-                let rhsAsm = doCodegen env rhs
-
-                lhsAsm ++
-                Asm(RV.BNE(Reg.r(env.Target), Reg.zero, trueLabel)) ++
-                rhsAsm ++
-                Asm(RV.BNE(Reg.r(env.Target), Reg.zero, trueLabel)) ++
-                Asm(RV.LI(Reg.r(env.Target), 0)) ++
-                Asm(RV.J(endLabel)) ++
-                Asm(RV.LABEL trueLabel) ++
-                Asm(RV.LI(Reg.r(env.Target), 1)) ++
-                Asm(RV.LABEL endLabel)
+                lAsm ++
+                Asm(RV.BNE(Reg.r(env.Target), Reg.zero, trueLabel), "jump to true if rhs true") ++
+                rAsm ++
+                Asm([
+                    RV.MV(Reg.r(env.Target), Reg.r(rtarget)), "move rhs to target";
+                    RV.J(endLabel), "jump to end";
+                    RV.LABEL trueLabel, "true";
+                    RV.LI(Reg.r(env.Target), 1), "set to true";
+                    RV.LABEL endLabel, "end"
+                ])
             | Xor(_,_) ->
                 Asm(RV.XOR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
             | x -> failwith $"BUG: unexpected operation %O{x}"
         // Put everything together
-        lAsm ++ rAsm ++ opAsm
+        if (match expr with 
+            | ScAnd _ 
+            | ScOr _ -> true 
+            | _ -> false) then opAsm
+        else lAsm ++ rAsm ++ opAsm
 
     | Not(arg) ->
         /// Generated code for the argument expression (note that we don't need
