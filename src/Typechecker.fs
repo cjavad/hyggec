@@ -555,6 +555,19 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
         | Error(es), Ok(_) -> Error(es)
         | Error(esCond), Error(esBody) -> Error(esCond @ esBody)
 
+    | For(init, cond, step, body) ->
+        match ((typer env cond), (typer env body)) with
+        | (Ok(tcond), Ok(tbody)) when (isSubtypeOf env tcond.Type TBool) ->
+            Ok { Pos = node.Pos; Env = env; Type = TUnit; Expr = While(tcond, tbody)}
+        | (Ok(tcond), Ok(_)) ->
+            Error([(tcond.Pos, $"'while' condition: expected type %O{TBool}, "
+                               + $"found %O{tcond.Type}")])
+        | Ok(tcond), Error(es) ->
+            Error((tcond.Pos, $"'while' condition: expected type %O{TBool}, "
+                              + $"found %O{tcond.Type}") :: es)
+        | Error(es), Ok(_) -> Error(es)
+        | Error(esCond), Error(esBody) -> Error(esCond @ esBody)
+
     | Lambda(args, body) ->
         let (argNames, argPretypes) = List.unzip args
         /// Duplicate names in 'lambda' arguments

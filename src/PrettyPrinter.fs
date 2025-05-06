@@ -213,6 +213,11 @@ let rec internal formatASTRec (node: AST.Node<'E,'T>): Tree =
     | While(cond, body) ->
         mkTree $"While" node [("cond", formatASTRec cond)
                               ("body", formatASTRec body)]
+    | For(init, cond, step, body) ->
+        mkTree $"For" node [("init", formatASTRec init)
+                            ("cond", formatASTRec cond)
+                            ("step", formatASTRec step)
+                            ("body", formatASTRec body)]
     | Lambda(args, body) ->
         /// Formatted arguments with their pretype
         let argChildren =
