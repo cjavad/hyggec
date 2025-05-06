@@ -136,6 +136,13 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         let substBody = subst body var sub
         {node with Expr = While(substCond, substBody)}
 
+    | For(init, cond, step, body) ->
+        let substInit = subst init var sub
+        let substCond = subst cond var sub
+        let substStep = subst step var sub
+        let substBody = subst body var sub
+        {node with Expr = For(substInit, substCond, substStep, substBody)}
+
     | Lambda(args, body) ->
         /// Arguments of this lambda term, without their pretypes
         let (argVars, _) = List.unzip args
@@ -228,6 +235,7 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
         // Union of the free names of the lhs and the rhs of the assignment
         Set.union (freeVars target) (freeVars expr)
     | While(cond, body) -> Set.union (freeVars cond) (freeVars body)
+    | For(init, cond, step, body) -> Set.union (freeVars cond) (freeVars body)
     | Assertion(arg) -> freeVars arg
     | Type(_, _, scope) -> freeVars scope
     | Lambda(args, body) ->
@@ -327,6 +335,7 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         // Union of the captured vars of the lhs and the rhs of the assignment
         Set.union (capturedVars target) (capturedVars expr)
     | While(cond, body) -> Set.union (capturedVars cond) (capturedVars body)
+    | For(init, cond, step, body) -> Set.union (capturedVars cond) (capturedVars body)
     | Assertion(arg) -> capturedVars arg
     | Type(_, _, scope) -> capturedVars scope
     | Application(expr, args) ->

@@ -102,6 +102,7 @@ rule tokenize = parse
 | "type"       { Parser.TYPE }
 | "mutable"    { Parser.MUTABLE }
 | "while"      { Parser.WHILE }
+| "for"        { Parser.FOR }
 | "do"         { Parser.DO }
 | "fun"        { Parser.FUN }
 | "struct"     { Parser.STRUCT }
