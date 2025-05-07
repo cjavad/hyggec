@@ -846,26 +846,21 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
         let scopeTarget = env.Target + 1u
         let scopeVarStorage = env.VarStorage.Add(ident, Storage.Reg(Reg.r(env.Target)))
         let scopeEnv = { env with Target = scopeTarget; VarStorage = scopeVarStorage }
+
+        initCode ++
         Asm(RV.LABEL(forBeginLabel)) ++
         (doCodegen scopeEnv cond)
             .AddText([
-                (RV.BNEZ(Reg.r(env.Target), forBodyBeginLabel),
-                 "Jump to loop body if 'for' condition is true")
-                (RV.LA(Reg.r(env.Target), forEndLabel),
-                 "Load address of label at the end of the 'for' loop")
-                (RV.JR(Reg.r(env.Target)), "Jump to the end of the loop")
-                (RV.LABEL(forBodyBeginLabel),
-                 "Body of the 'for' loop starts here")
-            ]) ++
+            (RV.BEQZ(Reg.r(env.Target+1u), forEndLabel), "Exit 'for' loop if condition is false")
+            (RV.LABEL(forBodyBeginLabel), "'for' loop body begins")
+            ]
+        ) ++
         (doCodegen scopeEnv body)
             .AddText(RV.COMMENT("Loop body complete")) ++
-        (doCodegen scopeEnv step)
-            .AddText([
-                (RV.LA(Reg.r(env.Target), forBeginLabel),
-                 "Load address of label at the beginning of the 'for' loop")
-                (RV.JR(Reg.r(env.Target)), "Jump to the end of the loop")
-                (RV.LABEL(forEndLabel), "")
-            ])
+        (doCodegen scopeEnv step) ++
+        Asm(RV.J(forBeginLabel)) ++
+        Asm(RV.LABEL(forEndLabel))
+
 
     | Lambda(args, body) ->
         /// Label to mark the position of the lambda term body
