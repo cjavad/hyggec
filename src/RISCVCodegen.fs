@@ -746,6 +746,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                 (RV.LABEL(whileEndLabel), "")
             ])
 
+    | For(init, cond, step, body) ->
+        Asm(RV.COMMENT("for loop wip"))
+
     | Lambda(args, body) ->
         /// Label to mark the position of the lambda term body
         let funLabel = Util.genSymbol "lambda"
