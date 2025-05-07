@@ -219,13 +219,6 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
             | x -> failwith $"BUG: unexpected operation %O{x}"
 
         lAsm ++ rAsm ++ opAsm
-    | Sqrt(arg) ->
-        let asm = doCodegen env arg
-        match (arg.Type) with
-            | t when (isSubtypeOf arg.Env t TFloat) -> 
-                asm.AddText(RV.FSQRT_S(FPReg.r(env.FPTarget),
-                                       FPReg.r(env.FPTarget)))
-            | t -> failwith $"BUG: unexpected operation %O{t}"
     | And(lhs, rhs)
     | ScAnd(lhs,rhs)
     | Xor(lhs, rhs)
@@ -782,13 +775,6 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         //         (RV.JR(Reg.r(env.Target)), "Jump to the end of the loop")
         //         (RV.LABEL(forEndLabel), "")
         //     ])
-
-
-    | For(init, cond, step, body) ->
-        Asm(RV.COMMENT("for loop wip"))
-
-    | For(init, cond, step, body) ->
-        Asm(RV.COMMENT("for loop wip"))
 
     | Lambda(args, body) ->
         /// Label to mark the position of the lambda term body
