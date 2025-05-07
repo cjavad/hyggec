@@ -555,18 +555,40 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
         | Error(es), Ok(_) -> Error(es)
         | Error(esCond), Error(esBody) -> Error(esCond @ esBody)
 
-    | For(init, cond, step, body) ->
-        match ((typer env cond), (typer env body)) with
-        | (Ok(tcond), Ok(tbody)) when (isSubtypeOf env tcond.Type TBool) ->
-            Ok { Pos = node.Pos; Env = env; Type = TUnit; Expr = While(tcond, tbody)}
-        | (Ok(tcond), Ok(_)) ->
-            Error([(tcond.Pos, $"'while' condition: expected type %O{TBool}, "
+    | For(ident , init, cond, step, body) ->
+        match (typer env init) with
+        | Ok(tinit) ->
+            let loopEnv = { Vars = env.Vars.Add(ident, tinit.Type); Mutables = env.Mutables.Add(ident); TypeVars = env.TypeVars}
+            match ((typer loopEnv cond), (typer loopEnv step), (typer loopEnv body)) with
+            | Ok(tcond), Ok(tstep), Ok(tbody) when (isSubtypeOf loopEnv tcond.Type TBool) ->
+                Ok { Pos = node.Pos; Env = env; Type = TUnit; Expr = LetMut(ident, tinit, { Pos = node.Pos; Env = loopEnv; Type = TUnit; Expr = While(tcond, 
+                    { Pos = node.Pos; Env = loopEnv; Type = TUnit; Expr = Seq([tbody;tstep])})})}
+            | Ok(tcond), Ok(_), Ok(_) ->
+                Error([(tcond.Pos, $"'for' condition: expected type %O{TBool}, "
                                + $"found %O{tcond.Type}")])
-        | Ok(tcond), Error(es) ->
-            Error((tcond.Pos, $"'while' condition: expected type %O{TBool}, "
-                              + $"found %O{tcond.Type}") :: es)
-        | Error(es), Ok(_) -> Error(es)
-        | Error(esCond), Error(esBody) -> Error(esCond @ esBody)
+            | Error(esCond), Error(esStep), Error(esBody) -> 
+                Error(esCond @ esStep @esBody)
+            | Error(esCond), _, Error(esBody) ->
+                Error(esCond @ esBody)
+            | Error(es), _, _ -> 
+                Error(es)
+            | _, Error(es), _ -> 
+                Error(es)
+            | _, _, Error(es) -> 
+                Error(es)
+
+        | Error(es) -> Error(es)
+        // match ((typer env cond), (typer env step), (typer env body)) with
+        // | (Ok(tcond), Ok(tbody)) when (isSubtypeOf env tcond.Type TBool) ->
+        //     Ok { Pos = node.Pos; Env = env; Type = TUnit; Expr = While(tcond, tbody)}
+        // | (Ok(tcond), Ok(_)) ->
+        //     Error([(tcond.Pos, $"'while' condition: expected type %O{TBool}, "
+        //                        + $"found %O{tcond.Type}")])
+        // | Ok(tcond), Error(es) ->
+        //     Error((tcond.Pos, $"'while' condition: expected type %O{TBool}, "
+        //                       + $"found %O{tcond.Type}") :: es)
+        // | Error(es), Ok(_) -> Error(es)
+        // | Error(esCond), Error(esBody) -> Error(esCond @ esBody)
 
     | Lambda(args, body) ->
         let (argNames, argPretypes) = List.unzip args
