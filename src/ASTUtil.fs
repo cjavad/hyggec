@@ -81,6 +81,8 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = Print(subst arg var sub)}
     | PrintLn(arg) ->
         {node with Expr = PrintLn(subst arg var sub)}
+    | Syscall(num, args) ->
+        {node with Expr = Syscall(num, List.map (fun n -> (subst n var sub)) args)}
     
     | Preinc(arg) ->
         {node with Expr = Preinc(subst arg var sub)}
@@ -172,6 +174,12 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
             else (lab, v, (subst cont var sub))
         let cases2 = List.map substCase cases
         {node with Expr = Match((subst expr var sub), cases2)}
+    | Array(length, data) ->
+        {node with Expr = Array((subst length var sub), (subst data var sub))}
+    | ArrayLength(arr) ->
+        {node with Expr = ArrayLength(subst arr var sub)}
+    | ArrayElem(arr, index) ->
+        {node with Expr = ArrayElem((subst arr var sub), (subst index var sub))}
 
 /// Compute the set of free variables in the given AST node.
 let rec freeVars (node: Node<'E,'T>): Set<string> =
@@ -242,6 +250,7 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
     | While(cond, body) -> Set.union (freeVars cond) (freeVars body)
     | For(ident, init, cond, step, body) -> Set.union (freeVars cond) (freeVars body)
     | Assertion(arg) -> freeVars arg
+    | Syscall(_, args) -> freeVarsInList args
     | Type(_, _, scope) -> freeVars scope
     | Lambda(args, body) ->
         let (argNames, _) = List.unzip args
@@ -266,6 +275,12 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
         /// Free variables in all match continuations
         let fvConts = List.fold folder Set[] cases
         Set.union (freeVars expr) fvConts
+    | Array(length, data) ->
+        Set.union (freeVars length) (freeVars data)
+    | ArrayLength(arr) ->
+        freeVars arr
+    | ArrayElem(arr, index) ->
+        Set.union (freeVars arr) (freeVars index)
 
 /// Compute the union of the free variables in a list of AST nodes.
 and internal freeVarsInList (nodes: List<Node<'E,'T>>): Set<string> =
@@ -342,6 +357,7 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
     | While(cond, body) -> Set.union (capturedVars cond) (capturedVars body)
     | For(ident, init, cond, step, body) -> Set.union (capturedVars cond) (capturedVars body)
     | Assertion(arg) -> capturedVars arg
+    | Syscall(_, args) -> capturedVarsInList args
     | Type(_, _, scope) -> capturedVars scope
     | Application(expr, args) ->
         let fvArgs = List.map capturedVars args
@@ -361,6 +377,12 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         /// Captured variables in all match continuations
         let cvConts = List.fold folder Set[] cases
         Set.union (capturedVars expr) cvConts
+    | Array(length, data) ->
+        Set.union (capturedVars length) (capturedVars data)
+    | ArrayLength(arr) ->
+        capturedVars arr
+    | ArrayElem(arr, index) ->
+        Set.union (capturedVars arr) (capturedVars index)
 
 /// Compute the union of the captured variables in a list of AST nodes.
 and internal capturedVarsInList (nodes: List<Node<'E,'T>>): Set<string> =
