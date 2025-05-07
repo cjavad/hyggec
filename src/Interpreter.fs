@@ -617,8 +617,7 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
         Some(env, { node with Expr = rewritten })
     
     | For(ident, init, cond, step, body) ->
-        let loopBody = Seq [body; step]
-        let loop = While(cond, { body with Expr = loopBody })
+        let loop = While(cond, { body with Expr = Seq ([body; step]) })
         Some(env, { node with Expr = LetMut(ident, init, {body with Expr = loop})})
 
     | Application(expr, args) ->

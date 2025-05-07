@@ -750,31 +750,30 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         let forBodyBeginLabel = Util.genSymbol "for_body_begin"
         let forEndLabel = Util.genSymbol "for_loop_end"
 
-        // let initCode = doCodegen env init
-        // let scopeTarget = env.Target + 1u
-        //let scopeVarStorage = env.VarStorage.Add(ident, Storage.Reg(Reg.r(env.Target)))
-        //let scopeEnv = { env with Target = scopeTarget; VarStorage = scopeVarStorage }
-        Asm()
-        // Asm(RV.LABEL(forBeginLabel)) ++
-        // (doCodegen scopeEnv cond)
-        //     .AddText([
-        //         (RV.BNEZ(Reg.r(env.Target), forBodyBeginLabel),
-        //          "Jump to loop body if 'for' condition is true")
-        //         (RV.LA(Reg.r(env.Target), forEndLabel),
-        //          "Load address of label at the end of the 'for' loop")
-        //         (RV.JR(Reg.r(env.Target)), "Jump to the end of the loop")
-        //         (RV.LABEL(forBodyBeginLabel),
-        //          "Body of the 'for' loop starts here")
-        //     ]) ++
-        // (doCodegen scopeEnv body)
-        //     .AddText(RV.COMMENT("Loop body complete")) ++
-        // (doCodegen scopeEnv step)
-        //     .AddText([
-        //         (RV.LA(Reg.r(env.Target), forBeginLabel),
-        //          "Load address of label at the beginning of the 'for' loop")
-        //         (RV.JR(Reg.r(env.Target)), "Jump to the end of the loop")
-        //         (RV.LABEL(forEndLabel), "")
-        //     ])
+        let initCode = doCodegen env init
+        let scopeTarget = env.Target + 1u
+        let scopeVarStorage = env.VarStorage.Add(ident, Storage.Reg(Reg.r(env.Target)))
+        let scopeEnv = { env with Target = scopeTarget; VarStorage = scopeVarStorage }
+        Asm(RV.LABEL(forBeginLabel)) ++
+        (doCodegen scopeEnv cond)
+            .AddText([
+                (RV.BNEZ(Reg.r(env.Target), forBodyBeginLabel),
+                 "Jump to loop body if 'for' condition is true")
+                (RV.LA(Reg.r(env.Target), forEndLabel),
+                 "Load address of label at the end of the 'for' loop")
+                (RV.JR(Reg.r(env.Target)), "Jump to the end of the loop")
+                (RV.LABEL(forBodyBeginLabel),
+                 "Body of the 'for' loop starts here")
+            ]) ++
+        (doCodegen scopeEnv body)
+            .AddText(RV.COMMENT("Loop body complete")) ++
+        (doCodegen scopeEnv step)
+            .AddText([
+                (RV.LA(Reg.r(env.Target), forBeginLabel),
+                 "Load address of label at the beginning of the 'for' loop")
+                (RV.JR(Reg.r(env.Target)), "Jump to the end of the loop")
+                (RV.LABEL(forEndLabel), "")
+            ])
 
     | Lambda(args, body) ->
         /// Label to mark the position of the lambda term body

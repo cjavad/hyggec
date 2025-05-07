@@ -561,8 +561,7 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
             let loopEnv = { Vars = env.Vars.Add(ident, tinit.Type); Mutables = env.Mutables.Add(ident); TypeVars = env.TypeVars}
             match ((typer loopEnv cond), (typer loopEnv step), (typer loopEnv body)) with
             | Ok(tcond), Ok(tstep), Ok(tbody) when (isSubtypeOf loopEnv tcond.Type TBool) ->
-                Ok { Pos = node.Pos; Env = env; Type = TUnit; Expr = LetMut(ident, tinit, { Pos = node.Pos; Env = loopEnv; Type = TUnit; Expr = While(tcond, 
-                    { Pos = node.Pos; Env = loopEnv; Type = TUnit; Expr = Seq([tbody;tstep])})})}
+                Ok { Pos = node.Pos; Env = env; Type = TUnit; Expr = For(ident, tinit, tcond, tstep, tbody) }
             | Ok(tcond), Ok(_), Ok(_) ->
                 Error([(tcond.Pos, $"'for' condition: expected type %O{TBool}, "
                                + $"found %O{tcond.Type}")])
