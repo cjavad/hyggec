@@ -64,10 +64,6 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         {node with Expr = And((substVar lhs var var2), (substVar rhs var var2))}
     | Or(lhs, rhs) ->
         {node with Expr = Or((substVar lhs var var2), (substVar rhs var var2))}
-    | ScOr(lhs, rhs) ->
-        {node with Expr = Or((substVar lhs var var2), (substVar rhs var var2))}
-    | Xor(lhs, rhs) ->
-        {node with Expr = Xor((substVar lhs var var2), (substVar rhs var var2))}
     | BNot(arg) ->
         {node with Expr = BNot(substVar arg var var2)}
     | BAnd(lhs, rhs) ->
@@ -80,6 +76,10 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         {node with Expr = BSL((substVar lhs var var2), (substVar rhs var var2))}
     | BSR(lhs, rhs) ->
         {node with Expr = BSR((substVar lhs var var2), (substVar rhs var var2))}
+    | ScOr(lhs, rhs) ->
+        {node with Expr = Or((substVar lhs var var2), (substVar rhs var var2))}
+    | Xor(lhs, rhs) ->
+        {node with Expr = Xor((substVar lhs var var2), (substVar rhs var var2))}
     | Sqrt(arg) ->
         {node with Expr = Sqrt(substVar arg var var2)}
     | Not(arg) ->
