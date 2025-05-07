@@ -147,12 +147,12 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         let substBody = substVar body var var2
         {node with Expr = While(substCond, substBody)}
 
-    | For(init, cond, step, body) ->
+    | For(ident, init, cond, step, body) ->
         let substCond = substVar cond var var2
         let substBody = substVar body var var2
         let substInit = substVar init var var2
         let substStep = substVar init var var2
-        {node with Expr = For(substInit, substCond, substStep, substBody)}
+        {node with Expr = For(ident, substInit, substCond, substStep, substBody)}
 
     | Assertion(arg) ->
         {node with Expr = Assertion(substVar arg var var2)}
@@ -406,7 +406,7 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
 
         ({node with Expr = Var(anfDef.Var)}, [anfDef])
 
-    | For(init, cond, step, body) ->
+    | For(ident, init, cond, step, body) ->
         /// Condition expression in ANF and related definitions
         let condANF = toANF (toANFDefs cond)
         /// Body of the 'while' loop in ANF
@@ -416,7 +416,7 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
 
         let stepANF = toANF (toANFDefs step)
         /// Definition binding this expression in ANF to its variable
-        let anfDef = ANFDef(false, {node with Expr = For(initANF, condANF, stepANF, bodyANF)})
+        let anfDef = ANFDef(false, {node with Expr = For(ident, initANF, condANF, stepANF, bodyANF)})
 
         ({node with Expr = Var(anfDef.Var)}, [anfDef])
     

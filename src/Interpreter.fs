@@ -616,14 +616,10 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
 
         Some(env, { node with Expr = rewritten })
     
-    | For(init, cond, step, body) ->
-        match init.Expr with
-        | LetMut (name, initExpr, _) ->
-            let whileBody = { body with Expr = Seq([ body; step ])}
-            let whileLoop = While(cond, whileBody)
-            let rewritten = LetMut(name, initExpr, { node with Expr = whileLoop })
-            Some(env, {node with Expr = rewritten})
-        | _ -> failwith $"ERROR: for loop init must be mutable,"
+    | For(ident, init, cond, step, body) ->
+        let loopBody = Seq [body; step]
+        let loop = While(cond, { body with Expr = loopBody })
+        Some(env, { node with Expr = LetMut(ident, init, {body with Expr = loop})})
 
     | Application(expr, args) ->
         match expr.Expr with
