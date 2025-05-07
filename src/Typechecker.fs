@@ -690,7 +690,7 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
         | Ok(tinit) ->
             let loopEnv = { Vars = env.Vars.Add(ident, tinit.Type); Mutables = env.Mutables.Add(ident); TypeVars = env.TypeVars}
             match ((typer loopEnv cond), (typer loopEnv step), (typer loopEnv body)) with
-            | Ok(tcond), Ok(tstep), Ok(tbody) when (isSubtypeOf loopEnv tcond.Type TBool) ->
+            | Ok(tcond), Ok(tstep), Ok(tbody) when (isSubtypeOf loopEnv Set.empty tcond.Type TBool) ->
                 Ok { Pos = node.Pos; Env = env; Type = TUnit; Expr = For(ident, tinit, tcond, tstep, tbody) }
             | Ok(tcond), Ok(_), Ok(_) ->
                 Error([(tcond.Pos, $"'for' condition: expected type %O{TBool}, "
@@ -707,17 +707,6 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
                 Error(es)
 
         | Error(es) -> Error(es)
-        // match ((typer env cond), (typer env step), (typer env body)) with
-        // | (Ok(tcond), Ok(tbody)) when (isSubtypeOf env tcond.Type TBool) ->
-        //     Ok { Pos = node.Pos; Env = env; Type = TUnit; Expr = While(tcond, tbody)}
-        // | (Ok(tcond), Ok(_)) ->
-        //     Error([(tcond.Pos, $"'while' condition: expected type %O{TBool}, "
-        //                        + $"found %O{tcond.Type}")])
-        // | Ok(tcond), Error(es) ->
-        //     Error((tcond.Pos, $"'while' condition: expected type %O{TBool}, "
-        //                       + $"found %O{tcond.Type}") :: es)
-        // | Error(es), Ok(_) -> Error(es)
-        // | Error(esCond), Error(esBody) -> Error(esCond @ esBody)
 
     | Lambda(args, body) ->
         let (argNames, argPretypes) = List.unzip args
