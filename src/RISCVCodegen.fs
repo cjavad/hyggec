@@ -262,7 +262,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                 Asm(RV.BNE(Reg.r(env.Target), Reg.zero, trueLabel), "jump to true if rhs true") ++
                 rAsm ++
                 Asm([
-                    RV.MV(Reg.r(env.Target), Reg.r(rtarget)), "move rhs to target";
+                    RV.MV(Reg.r(env.Target), Reg.r(rtarget)), "move rhs to target"; 
                     RV.J(endLabel), "jump to end";
                     RV.LABEL trueLabel, "true";
                     RV.LI(Reg.r(env.Target), 1), "set to true";
@@ -272,11 +272,10 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
                 Asm(RV.XOR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
             | x -> failwith $"BUG: unexpected operation %O{x}"
         // Put everything together
-        if (match expr with 
-            | ScAnd _ 
-            | ScOr _ -> true 
-            | _ -> false) then opAsm
-        else lAsm ++ rAsm ++ opAsm
+        match expr with 
+        | ScAnd _ 
+        | ScOr _ -> opAsm
+        | _ -> lAsm ++ rAsm ++ opAsm
 
     | Not(arg) ->
         /// Generated code for the argument expression (note that we don't need
