@@ -248,9 +248,6 @@ and Expr<'E, 'T> =
     /// Access a field of a target expression (e.g. a structure).
     | FieldSelect of target: Node<'E, 'T> * field: string
 
-    /// Make a copy of a structure.
-    | Copy of arg: Node<'E, 'T>
-
     /// Pointer to a location in the heap, with its address.  This is a runtime
     /// value that is only used by the Hygge interpreter as an intermediate
     /// result; it has no syntax in the parser, so it cannot be written in Hygge

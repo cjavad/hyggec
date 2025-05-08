@@ -836,16 +836,6 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
                           Expr = FieldSelect(texpr, field) }
             | _ -> Error([ (node.Pos, $"cannot access field '%s{field}' " + $"on expression of type %O{texpr.Type}") ])
         | Error(es) -> Error(es)
-    
-    | Copy(arg) ->
-        match typer env arg with
-        | Ok(targ) ->
-            match expandType env targ.Type with
-            | TStruct _ ->
-                Ok { Pos = node.Pos; Env = env; Type = targ.Type; Expr = Copy(targ)}
-            | t ->
-                Error [ (node.Pos, $"copy expects a struct, found %O{t}")]
-        | Error(es) -> Error(es)
 
     | Pointer(_) -> Error([ (node.Pos, "pointers cannot be type-checked (by design!)") ])
 

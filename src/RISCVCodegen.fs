@@ -775,8 +775,6 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
                 selTargetCode ++ rhsCode ++ assignCode
             | t ->
                 failwith $"BUG: field selection on invalid object type: %O{t}"
-
-
         | ArrayElem(target, index) ->
             let targetCode = doCodegen env target
             let indexCode = doCodegen { env with Target = env.Target + 1u } index
@@ -1056,9 +1054,6 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
 
         // Put everything together: compile the target, access the field
         selTargetCode ++ fieldAccessCode
-
-    | Copy(arg) ->
-        failwith $"BUG: copy not yet implemented in codegen"
 
     | Pointer(_) -> failwith "BUG: pointers cannot be compiled (by design!)"
 
