@@ -246,6 +246,7 @@ let rec internal formatASTRec (node: AST.Node<'E, 'T>) : Tree =
 
         mkTree "StructCons" node fieldsChildren
     | FieldSelect(target, field) -> mkTree $"FieldSelect %s{field}" node [ ("expr", formatASTRec target) ]
+    | Copy(arg) -> mkTree "Copy" node [("arg", formatASTRec arg)]
     | Pointer(addr) -> mkTree $"Pointer 0x%x{addr}" node []
     | UnionCons(label, expr) -> mkTree $"UnionCons %s{label}" node [ ("expr", formatASTRec expr) ]
     | Match(expr, cases) ->

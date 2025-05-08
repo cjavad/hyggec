@@ -104,7 +104,6 @@ type internal RuntimeEnv<'E, 'T> =
         + $"%s{Util.nl}  - Heap: %s{heapStr}"
         + $"%s{Util.nl}  - PtrInfo: %s{ptrInfoStr}"
 
-
 /// Attempt to reduce the given AST node by one step, using the given runtime
 /// environment.  If a reduction is possible, return the reduced node and an
 /// updated runtime environment; otherwise, return None.
@@ -717,8 +716,13 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
         Some(env, { node with Expr = rewritten })
     
     | For(ident, init, cond, step, body) ->
-        let loop = While(cond, { body with Expr = Seq ([body; step]) })
-        Some(env, { node with Expr = LetMut(ident, init, {body with Expr = loop})})
+        match (reduce env init) with
+        | Some(env', init') ->
+            Some(env', { node with Expr = For(ident, init', cond, step, body)})
+        | None when isValue init ->
+            let loop = While(cond, { body with Expr = Seq ([body; step]) })
+            Some(env, { node with Expr = LetMut(ident, init, {body with Expr = loop})})
+        | None -> None
 
     | Application(expr, args) ->
         match expr.Expr with
@@ -805,6 +809,18 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             )
         | None -> None
     | FieldSelect(_, _) -> None
+
+    | Copy(arg) ->
+        match reduce env arg with
+        | Some(env', arg') ->
+            Some(env', { node with Expr = Copy(arg')})
+        | None when isValue arg ->
+            match arg.Expr with
+            | Pointer addr ->
+                let env', _, base' = deepCopyPointer env Map.empty addr
+                Some(env', { node with Expr = Pointer base' })
+            | _ -> None
+        | _ -> None
 
     | UnionCons(label, expr) ->
         match (reduce env expr) with
@@ -904,6 +920,73 @@ and internal heapAlloc (heap: Heap<'E, 'T>) (values: List<Node<'E, 'T>>) : Heap<
     let folder (h: Heap<'E, 'T>) (offset, n) : Heap<'E, 'T> = h.Add(baseAddr + uint (offset), n)
     let heap2 = List.fold folder heap (List.indexed values)
     (heap2, baseAddr)
+
+/// Recursively clone the heap object rooted at `addr`.
+/// Returns: (updatedEnv, memo, newBaseAddr)
+and internal deepCopyPointer
+        (env  : RuntimeEnv<'E,'T>)
+        (memo : Map<uint,uint>)      // old → new to break cycles / preserve sharing
+        (addr : uint)
+        : RuntimeEnv<'E,'T> * Map<uint,uint> * uint =
+
+    // ➊  already copied?
+    match memo.TryFind addr with
+    | Some newAddr -> env, memo, newAddr
+
+    // ➋  dispatch on the kind of heap object ------------------------------
+    | None ->
+        match env.PtrInfo.[addr] with
+        //──────────────────────────────────────────────────────────────────
+        | StructFields fields ->
+            // original field values in order
+            let vals : Node<'E,'T> list =
+                fields |> List.mapi (fun i _ -> env.Heap.[addr + uint i])
+
+            // copy each slot, recursing on pointers
+            let copySlot (e,m,acc) (v: Node<'E,'T>) =
+                match v.Expr with
+                | Pointer p ->
+                    let e', m', p' = deepCopyPointer e m p
+                    e', m', acc @ [ { v with Expr = Pointer p' } ]
+                | _ -> e, m, acc @ [ v ]
+
+            let env', memo', copiedVals =
+                List.fold copySlot (env, memo, []) vals
+
+            // allocate fresh struct
+            let heap'', base' = heapAlloc env'.Heap copiedVals
+            let env'' =
+                { env' with
+                    Heap    = heap''
+                    PtrInfo = env'.PtrInfo.Add(base', StructFields fields) }
+
+            env'', memo'.Add(addr, base'), base'
+
+        //──────────────────────────────────────────────────────────────────
+        | Arraylen len ->
+            // fetch all elements
+            let elems : Node<'E,'T> list =
+                [0u .. len-1u] |> List.map (fun i -> env.Heap.[addr + i])
+
+            let copyElem (e,m,acc) (v: Node<'E,'T>) =
+                match v.Expr with
+                | Pointer p ->
+                    let e', m', p' = deepCopyPointer e m p
+                    e', m', acc @ [ { v with Expr = Pointer p' } ]
+                | _ -> e, m, acc @ [ v ]
+
+            let env', memo', copiedElems =
+                List.fold copyElem (env, memo, []) elems
+
+            // allocate new array
+            let heap'', base' = heapAlloc env'.Heap copiedElems
+            let env'' =
+                { env' with
+                    Heap    = heap''
+                    PtrInfo = env'.PtrInfo.Add(base', Arraylen len) }
+
+            env'', memo'.Add(addr, base'), base'
+
 
 /// Reduce the given AST until it cannot reduce further, using the given
 /// (optional) 'reader' and 'writer' functions.  Return the final unreducible

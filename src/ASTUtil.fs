@@ -164,6 +164,9 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
     | FieldSelect(target, field) ->
         {node with Expr = FieldSelect((subst target var sub), field)}
 
+    | Copy(arg) ->
+        {node with Expr = Copy((subst arg var sub))}
+
     | UnionCons(label, expr) ->
         {node with Expr = UnionCons(label, (subst expr var sub))}
 
@@ -265,6 +268,7 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
         let (_, nodes) = List.unzip fields
         freeVarsInList nodes
     | FieldSelect(expr, _) -> freeVars expr
+    | Copy(arg) -> freeVars arg
     | UnionCons(_, expr) -> freeVars expr
     | Match(expr, cases) ->
         /// Compute the free variables in all match cases continuations, minus
@@ -367,6 +371,7 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         let (_, nodes) = List.unzip fields
         capturedVarsInList nodes
     | FieldSelect(expr, _) -> capturedVars expr
+    | Copy(arg) -> capturedVars arg
     | UnionCons(_, expr) -> capturedVars expr
     | Match(expr, cases) ->
         /// Compute the captured variables in all match cases continuations,

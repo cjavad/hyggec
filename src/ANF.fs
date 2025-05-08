@@ -180,6 +180,9 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
 
     | FieldSelect(target, field) ->
         {node with Expr = FieldSelect((substVar target var var2), field)}
+    
+    | Copy(arg) ->
+        {node with Expr = Copy(substVar arg var var2)}
 
     | UnionCons(label, expr) ->
         {node with Expr = UnionCons(label, (substVar expr var var2))}
@@ -491,6 +494,12 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
         let (targetANF, targetDefs) = toANFDefs target
         /// Definition binding this expression in ANF to its variable
         let anfDef = ANFDef(false, {node with Expr = FieldSelect(targetANF, field)})
+
+        ({node with Expr = Var(anfDef.Var)}, anfDef :: targetDefs)
+
+    | Copy(arg) ->
+        let (targetANF, targetDefs) = toANFDefs arg
+        let anfDef = ANFDef(false, {node with Expr = Copy(targetANF)})
 
         ({node with Expr = Var(anfDef.Var)}, anfDef :: targetDefs)
 
