@@ -1,2 +1,0 @@
-let t: tuple {int, bool} = tuple {4, true};
-assert(t._1 = 4)

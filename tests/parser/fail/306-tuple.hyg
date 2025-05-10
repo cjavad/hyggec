@@ -1,1 +1,0 @@
-let t: tuple int, string = tuple {1, "a"}

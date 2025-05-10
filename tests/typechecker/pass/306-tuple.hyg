@@ -1,2 +1,0 @@
-let t: tuple {string, int} = tuple {"hi", 2};
-assert(t._2 + 1 = 3)

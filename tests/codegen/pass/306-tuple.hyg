@@ -1,3 +1,0 @@
-let t: tuple {string, int, bool} = tuple {"Hello", 42, true};
-t._2 <- t._2 + 10;
-assert(t._2 = 52)

@@ -113,10 +113,8 @@ rule tokenize = parse
 | "array"      { Parser.ARRAY }
 | "arrayLength" { Parser.ARRAYLENGTH }
 | "arrayElem"  { Parser.ARRAYELEM }
-| "tuple"      { Parser.TUPLE }
 
 // Generic identifier
-| "_" digit+   { Parser.TUPLE_INDEX(int ((LexBuffer<_>.LexemeString lexbuf).Substring 1))}
 | ident        { Parser.IDENT(LexBuffer<_>.LexemeString lexbuf) }
 
 // End of file

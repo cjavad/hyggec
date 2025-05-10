@@ -1,1 +1,0 @@
-tuple {string, bool} = tuple {"hi", true}

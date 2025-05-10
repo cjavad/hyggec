@@ -55,8 +55,6 @@ and Pretype =
     | TUnion of cases: List<string * PretypeNode>
     /// An array pretype, with pretypes for the elements WIP
     | TArray of elements: PretypeNode
-    /// A tuple pretype
-    | TTuple of elements: List<PretypeNode>
     
 /// Node of the Abstract Syntax Tree of a Hygge expression.  The meaning of the
 /// two type arguments is the following: 'E specifies what typing environment
@@ -269,9 +267,6 @@ and Expr<'E, 'T> =
     | Array of length: Node<'E, 'T> * data: Node<'E, 'T>
     | ArrayLength of target: Node<'E, 'T>
     | ArrayElem of target: Node<'E, 'T> * index: Node<'E, 'T>
-    | TupleCons of elements: List<Node<'E, 'T>>
-    | TupleGet of tuple: Node<'E, 'T> * index: Node<'E, 'T>
-    | TupleSet of tuple: Node<'E, 'T> * index: Node<'E, 'T> * expr: Node<'E, 'T>
 
 
 /// A type alias for an untyped AST, where there is no typing environment nor

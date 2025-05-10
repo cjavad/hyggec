@@ -616,46 +616,6 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
                 | _ -> None
             | _ -> None
         | _ -> None
-
-    | TupleCons(elems) ->
-        match reduceList env elems with
-        | Some(env', elems') -> Some(env', { node with Expr = TupleCons(elems') })
-        | None when List.forall isValue elems ->
-            let (heap', baseAddr) = heapAlloc env.Heap elems
-            Some({ env with Heap = heap'; PtrInfo = env.PtrInfo.Add(baseAddr, Arraylen(uint elems.Length)) },
-                 { node with Expr = Pointer(baseAddr) })
-        | None -> None
-
-    | TupleGet(tupleExpr, indexExpr) ->
-        match reduce env tupleExpr, reduce env indexExpr with
-        | Some(env', texpr'), _ -> Some(env', { node with Expr = TupleGet(texpr', indexExpr) })
-        | None, Some(env', iexpr') -> Some(env', { node with Expr = TupleGet(tupleExpr, iexpr') })
-        | None, None when isValue tupleExpr && isValue indexExpr ->
-            match tupleExpr.Expr, indexExpr.Expr with
-            | Pointer(addr), IntVal(i) when i >= 1 ->
-                match env.PtrInfo.TryFind addr with
-                | Some(Arraylen len) when uint (i - 1) < len ->
-                    Some(env, env.Heap.[addr + uint (i - 1)])
-                | _ -> None
-            | _ -> None
-        | _ -> None
-
-    | TupleSet(tupleExpr, indexExpr, newVal) ->
-        match reduce env tupleExpr, reduce env indexExpr, reduce env newVal with
-        | Some(env', texpr'), _, _ -> Some(env', { node with Expr = TupleSet(texpr', indexExpr, newVal) })
-        | None, Some(env', iexpr'), _ -> Some(env', { node with Expr = TupleSet(tupleExpr, iexpr', newVal) })
-        | None, None, Some(env', val') -> Some(env', { node with Expr = TupleSet(tupleExpr, indexExpr, val') })
-        | None, None, None when isValue tupleExpr && isValue indexExpr && isValue newVal ->
-            match tupleExpr.Expr, indexExpr.Expr with
-            | Pointer(addr), IntVal(i) when i >= 1 ->
-                match env.PtrInfo.TryFind addr with
-                | Some(Arraylen len) when uint (i - 1) < len ->
-                    let env' = { env with Heap = env.Heap.Add(addr + uint (i - 1), newVal) }
-                    Some(env', newVal)
-                | _ -> None
-            | _ -> None
-        | _ -> None
-
     
     | Assign({ Expr = FieldSelect(selTarget, field) } as target, expr) when not (isValue selTarget) ->
         match (reduce env selTarget) with

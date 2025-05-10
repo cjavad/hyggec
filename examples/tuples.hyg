@@ -1,2 +1,0 @@
-let t: tuple {string, int, bool} = tuple {"Hello", 40 + 2, true};
-t._1 <- "Hej"

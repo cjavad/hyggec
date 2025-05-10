@@ -1,3 +1,0 @@
-let t: tuple {int, int, int} = tuple {1, 2, 3};
-t._3 <- t._3 + 1;
-assert(t._3 = 4)
