@@ -1121,6 +1121,92 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
                                "Array length from base addr")
         | t -> failwithf$"Bugged"
 
+    | TupleCons(fields) ->
+        let tupleSize = fields.Length * 4
+
+        let allocCode =
+            (beforeSysCall [ Reg.a0 ] [])
+                .AddText([
+                    (RV.LI(Reg.a0, tupleSize + 3), $"Allocate %d{tupleSize + 3} bytes for tuple + alignment buffer");
+                    (RV.LI(Reg.a7, 9), "RARS syscall: sbrk");
+                    (RV.ECALL, "");
+                    (RV.MV(Reg.r(env.Target + 1u), Reg.a0), "Raw address from sbrk (may be unaligned)");
+                ])
+            ++ (afterSysCall [ Reg.a0 ] [])
+            ++ Asm([
+                // Align the address in env.Target = aligned base address
+                (RV.ADDI(Reg.r(env.Target), Reg.r(env.Target + 1u), Imm12(3)), "Align: Add 3 to round up to next multiple of 4");
+                (RV.ANDI(Reg.r(env.Target), Reg.r(env.Target), Imm12(-4)), "Align: Clear last 2 bits");
+            ])
+
+        let storeCode =
+            fields
+            |> List.mapi (fun i field ->
+                let fieldReg = env.Target + 2u
+                doCodegen { env with Target = fieldReg } field
+                ++ Asm(RV.SW(Reg.r(fieldReg), Imm12(i * 4), Reg.r(env.Target)),
+                    $"Store tuple field %d{i}")
+            )
+            |> List.fold (++) (Asm())
+
+        allocCode ++ storeCode
+
+
+
+    | TupleGet(indexExpr, tupleExpr) ->
+        let tupleReg = env.Target       // holds base address of tuple (e.g., t0)
+        let indexReg = env.Target + 1u  // holds 1-based index (e.g., t1)
+        let addrReg  = env.Target + 2u  // computed address of field (e.g., t2)
+
+        let tupleCode = doCodegen env tupleExpr
+        let indexCode = doCodegen { env with Target = indexReg } indexExpr
+
+        let offsetCalc =
+            Asm([
+                (RV.ADDI(Reg.r(indexReg), Reg.r(indexReg), Imm12(-1)), "Convert to 0-based index");
+                (RV.LI(Reg.r(addrReg), 4), "Word size");
+                (RV.MUL(Reg.r(indexReg), Reg.r(indexReg), Reg.r(addrReg)), "Index * word size");
+                (RV.ADD(Reg.r(addrReg), Reg.r(tupleReg), Reg.r(indexReg)), "Compute address = base + offset");
+            ])
+
+        let load =
+            Asm(RV.LW(Reg.r(env.Target), Imm12(0), Reg.r(addrReg)), "Load tuple field")
+
+        tupleCode ++ indexCode ++ offsetCalc ++ load
+
+
+
+
+    | TupleSet(indexExpr, tupleExpr, valueExpr) ->
+        let tupleReg = env.Target       // base address (t0)
+        let indexReg = env.Target + 1u  // index (t1)
+        let valueReg = env.Target + 2u  // value to store (t2)
+        let addrReg  = env.Target + 3u  // computed address (t3)
+        let wordSizeReg = env.Target + 4u // constant 4
+
+        let tupleCode = doCodegen env tupleExpr
+        let indexCode = doCodegen { env with Target = indexReg } indexExpr
+        let valueCode = doCodegen { env with Target = valueReg } valueExpr
+
+        let offsetCalc =
+            Asm([
+                (RV.ADDI(Reg.r(indexReg), Reg.r(indexReg), Imm12(-1)), "Convert to 0-based index");
+                (RV.LI(Reg.r(wordSizeReg), 4), "Word size");
+                (RV.MUL(Reg.r(indexReg), Reg.r(indexReg), Reg.r(wordSizeReg)), "Index * word size");
+                (RV.ADD(Reg.r(addrReg), Reg.r(tupleReg), Reg.r(indexReg)), "Compute address = base + offset");
+            ])
+
+        let store =
+            Asm(RV.SW(Reg.r(valueReg), Imm12(0), Reg.r(addrReg)), "Store tuple field")
+
+        tupleCode ++ indexCode ++ valueCode ++ offsetCalc ++ store
+
+
+
+
+
+
+
 /// Generate code to save the given registers on the stack, before a RARS system
 /// call. Register a7 (which holds the system call number) is backed-up by
 /// default, so it does not need to be specified when calling this function.

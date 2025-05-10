@@ -1,0 +1,2 @@
+let t: tuple {int} = tuple {1};
+assert(t._2 = 1)

@@ -180,6 +180,19 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = ArrayLength(subst arr var sub)}
     | ArrayElem(arr, index) ->
         {node with Expr = ArrayElem((subst arr var sub), (subst index var sub))}
+    | TupleCons(elems) ->
+        let elems' = List.map (fun e -> subst e var sub) elems
+        { node with Expr = TupleCons(elems') }
+    | TupleGet(tupleExpr, indexExpr) ->
+        let tupleExpr' = subst tupleExpr var sub
+        let indexExpr' = subst indexExpr var sub
+        { node with Expr = TupleGet(tupleExpr', indexExpr') }
+    | TupleSet(tupleExpr, indexExpr, newVal) ->
+        let tupleExpr' = subst tupleExpr var sub
+        let indexExpr' = subst indexExpr var sub
+        let newVal' = subst newVal var sub
+        { node with Expr = TupleSet(tupleExpr', indexExpr', newVal') }
+
 
 /// Compute the set of free variables in the given AST node.
 let rec freeVars (node: Node<'E,'T>): Set<string> =
@@ -281,6 +294,13 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
         freeVars arr
     | ArrayElem(arr, index) ->
         Set.union (freeVars arr) (freeVars index)
+    | TupleCons(elems) ->
+        freeVarsInList elems
+    | TupleGet(tupleExpr, indexExpr) ->
+        Set.union (freeVars tupleExpr) (freeVars indexExpr)
+    | TupleSet(tupleExpr, indexExpr, newVal) ->
+        Set.unionMany [ freeVars tupleExpr; freeVars indexExpr; freeVars newVal ]
+
 
 /// Compute the union of the free variables in a list of AST nodes.
 and internal freeVarsInList (nodes: List<Node<'E,'T>>): Set<string> =
@@ -383,6 +403,13 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         capturedVars arr
     | ArrayElem(arr, index) ->
         Set.union (capturedVars arr) (capturedVars index)
+    | TupleCons(elems) ->
+        capturedVarsInList elems
+    | TupleGet(tupleExpr, indexExpr) ->
+        Set.union (capturedVars tupleExpr) (capturedVars indexExpr)
+    | TupleSet(tupleExpr, indexExpr, newVal) ->
+        Set.unionMany [ capturedVars tupleExpr; capturedVars indexExpr; capturedVars newVal ]
+
 
 /// Compute the union of the captured variables in a list of AST nodes.
 and internal capturedVarsInList (nodes: List<Node<'E,'T>>): Set<string> =

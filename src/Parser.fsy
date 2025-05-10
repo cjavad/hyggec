@@ -88,6 +88,8 @@ let mkNode (parseState: IParseState, inputIdx: int, e: UntypedExpr): UntypedAST 
 %token STRUCT
 %token UNION MATCH WITH
 %token ARRAY ARRAYLENGTH ARRAYELEM
+%token TUPLE
+%token <int> TUPLE_INDEX
 
 // Generic identifier (might result in a variable, pretype, etc.)
 %token <string> IDENT
@@ -161,6 +163,7 @@ simpleExpr:
   | FUN parenArgTypesSeq RARROW simpleExpr  { mkNode(parseState, 1, Expr.Lambda($2, $4)) }
   | MATCH simpleExpr WITH LCURLY matchCases RCURLY  { mkNode(parseState, 1,
                                                              Expr.Match($2, $5)) }
+  | primary DOT TUPLE_INDEX LARROW simpleExpr { mkNode(parseState, 3, Expr.TupleSet($1, mkNode(parseState, 2, Expr.IntVal($3)), $5))}
 
 // An 'if-then-else' expression
 ifExpr:
@@ -262,6 +265,8 @@ primary:
   | ARRAY LPAR simpleExpr COMMA simpleExpr RPAR { mkNode(parseState, 2, Expr.Array($3, $5)) }
   | ARRAYLENGTH LPAR simpleExpr RPAR         { mkNode(parseState, 1, Expr.ArrayLength($3)) }
   | ARRAYELEM LPAR simpleExpr COMMA simpleExpr RPAR { mkNode(parseState, 2, Expr.ArrayElem($3, $5)) }
+  | TUPLE LCURLY exprCommaSeq RCURLY         { mkNode(parseState, 1, Expr.TupleCons($3)) }
+  | primary DOT TUPLE_INDEX                  { mkNode(parseState, 2, Expr.TupleGet($1, mkNode(parseState, 3, Expr.IntVal($3)))) }
 
 // Variable name
 variable:
@@ -287,6 +292,8 @@ pretype:
                                                              Pretype.TUnion($3)) }
   | ARRAY LCURLY pretype RCURLY              { mkPretypeNode(parseState, 1,
                                                              Pretype.TArray($3)) }
+  | TUPLE LCURLY typesSeq RCURLY             { mkPretypeNode(parseState, 1,
+                                                             Pretype.TTuple($3)) }
 
 // Generic identifier
 ident:

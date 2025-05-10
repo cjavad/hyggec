@@ -1,0 +1,3 @@
+let t: tuple {int, bool} = tuple {1, true};
+t._1 <- true;
+assert(t._1 = true)

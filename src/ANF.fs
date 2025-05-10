@@ -195,6 +195,10 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
     | ArrayElem(target, index) -> failwith "Not done"
     | ArrayLength(target) -> failwith "Not done"
     | Array(length, data) -> failwith "Not done"
+    | TupleCons(_)
+    | TupleGet(_, _)
+    | TupleSet(_, _, _) -> failwith "Not implemented"
+
     
 
 
@@ -347,6 +351,11 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
     | Array(length, data) -> failwith"Implement array"
     | ArrayElem(target, index) -> failwith"Implement array"
     | ArrayLength(target) -> failwith"Implement array"
+
+    | TupleCons(items) -> failwith "not yet done"
+    | TupleGet(tup, index) -> failwith "not yet done"
+    | TupleSet(tup, index, value) -> failwith "not yet done"
+
     
     | If(condition, ifTrue, ifFalse) ->
         /// Condition in ANF and related definitions

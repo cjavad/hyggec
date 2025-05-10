@@ -147,6 +147,14 @@ let rec internal resolvePretype (env: TypingEnv) (pt: AST.PretypeNode) : Result<
         else
             let returnType = getOkValue returnType
             Ok(TArray(returnType))
+    | Pretype.TTuple(elements) ->
+        let resolved = List.map (resolvePretype env) elements
+        let errors = collectErrors resolved
+        if not errors.IsEmpty then Error(errors)
+        else
+            let elementTypes = List.map getOkValue resolved
+            Ok(TTuple(elementTypes))
+
         
 
 /// Resolve a type variable using the given typing environment: optionally
@@ -435,19 +443,19 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
     | LessEq(lhs, rhs) ->
         match (numericalRelationTyper "less than or equals" node.Pos env lhs rhs) with
         | Ok(tlhs, trhs) ->
-            Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = Less(tlhs, trhs) }
+            Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = LessEq(tlhs, trhs) }
         | Error(es) -> Error(es)
     
     | Greater(lhs, rhs) ->
         match (numericalRelationTyper "Greater than" node.Pos env lhs rhs) with
         | Ok(tlhs, trhs) ->
-            Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = Less(tlhs, trhs) }
+            Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = Greater(tlhs, trhs) }
         | Error(es) -> Error(es)
 
     | GreaterEq(lhs, rhs) ->
         match (numericalRelationTyper "greater than or equals" node.Pos env lhs rhs) with
         | Ok(tlhs, trhs) ->
-            Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = Less(tlhs, trhs) }
+            Ok { Pos = node.Pos; Env = env; Type = TBool; Expr = GreaterEq(tlhs, trhs) }
         | Error(es) -> Error(es)
 
     | ReadInt ->
@@ -875,6 +883,69 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
             | t ->
                 Error([node.Pos, $"Array element: expected type of array but found $O{t}"])
         | (Error(es), _) | (_, Error(es)) -> Error(es)
+
+    | TupleCons(elements) ->
+        let typedElems = List.map (typer env) elements
+        let errors = collectErrors typedElems
+
+        if not errors.IsEmpty then Error(errors)
+        else
+            let telems = List.map getOkValue typedElems
+            let ttypes = List.map (fun (t: TypedAST) -> t.Type) telems
+            Ok {
+                Pos = node.Pos
+                Env = env
+                Type = TTuple(ttypes)
+                Expr = TupleCons(telems)
+            }
+
+    | TupleGet(tup, index) ->
+        match typer env tup, typer env index with
+        | Ok(ttup), Ok(tindex) ->
+            match expandType env ttup.Type, tindex.Expr with
+            | TTuple(elements), IntVal(i) ->
+                if i < 1 || i > elements.Length then
+                    Error [ (node.Pos, $"tuple index out of bounds: %d{i}") ]
+                else
+                    Ok {
+                        Pos = node.Pos
+                        Env = env
+                        Type = elements[i-1]
+                        Expr = TupleGet(ttup, tindex)
+                    }
+            | TTuple(_), _ ->
+                Error [ (tindex.Pos, $"tuple index must be an integer literal") ]
+            | other, _ ->
+                Error [ (ttup.Pos, $"expected a tuple, but found value of type %O{other}") ]
+        | Error(es1), Error(es2) -> Error(es1 @ es2)
+        | Error(es), _ | _, Error(es) -> Error(es)
+
+
+    | TupleSet(tup, index, newVal) ->
+        match typer env tup, typer env index, typer env newVal with
+        | Ok(ttup), Ok(tindex), Ok(tnew) ->
+            match expandType env ttup.Type, tindex.Expr with
+            | TTuple(elements), IntVal(i) ->
+                if i < 1 || i > elements.Length then
+                    Error [ (tindex.Pos, $"tuple index out of bounds: %d{i-1}") ]
+                elif not (isSubtypeOf env Set.empty tnew.Type elements[i-1]) then
+                    Error [ (tnew.Pos, $"mismatched type in tuple assignment: expected %O{elements[i]}, found %O{tnew.Type}") ]
+                else
+                    Ok {
+                        Pos = node.Pos
+                        Env = env
+                        Type = elements[i-1]
+                        Expr = TupleSet(ttup, tindex, tnew)
+                    }
+            | TTuple(_), _ ->
+                Error [ (tindex.Pos, "tuple index must be an integer literal") ]
+            | tnonTuple, _ ->
+                Error [ (ttup.Pos, $"expected a tuple, but found value of type %O{tnonTuple}") ]
+        | Error(es1), Error(es2), Error(es3) -> Error(es1 @ es2 @ es3)
+        | Error(es), _, _ -> Error(es)
+        | _, Error(es), _ -> Error(es)
+        | _, _, Error(es) -> Error(es)
+
 
     | Match(expr, cases) ->
         /// Duplicate labels in the pattern matching cases

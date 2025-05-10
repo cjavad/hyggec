@@ -1,0 +1,2 @@
+let t: tuple {string, int} = tuple {"H", 4};
+assert(t._2 = 4)
