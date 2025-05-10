@@ -1052,7 +1052,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
                     Asm(RV.LW(Reg.r(env.Target), Imm12(0), Reg.r(env.Target)),
                         "Load array element")
                 | _ ->
-                    failwithf$"Will implement later"
+                    failwithf$"Bugged"
             targetCode ++ indexCode ++ addrCode ++ loadCode
         | t -> failwithf"Bugged"
     | ArrayLength(target) ->

@@ -204,7 +204,8 @@ let rec isSubtypeOf (env: TypingEnv) (A: Set<Type * Type>) (t1: Type) (t2: Type)
             if (fieldNames1 <> fieldNames2) then
                 false
             else
-                List.forall2 (fun t1 t2 -> isSubtypeOf env A t1 t2)
+                let newA = A.Add(t1,t2)
+                List.forall2 (fun t1 t2 -> isSubtypeOf env newA t1 t2)
                                 fieldTypes1 fieldTypes2
     | (TUnion(cases1), TUnion(cases2)) ->
         /// Labels of the subtype union
@@ -219,7 +220,8 @@ let rec isSubtypeOf (env: TypingEnv) (A: Set<Type * Type>) (t1: Type) (t2: Type)
             // must have a subtyped argument in the subtype union
             let map1 = Map.ofList cases1
             let map2 = Map.ofList cases2
-            List.forall (fun l -> isSubtypeOf env A map1.[l] map2.[l]) labels1
+            let newA = A.Add(t1,t2)
+            List.forall (fun l -> isSubtypeOf env newA map1.[l] map2.[l]) labels1
     | (_, _) -> false
 
 

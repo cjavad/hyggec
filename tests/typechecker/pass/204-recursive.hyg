@@ -1,0 +1,19 @@
+type Sequence = union {
+    End: int;
+    Next: Sequence
+};
+
+type Chain = union {
+    End: int;
+    Next: Chain
+};
+
+fun isEnd(s: Sequence): bool =
+    match s with {
+        End{_} -> true;
+        Next{_} -> false
+    };
+
+let c: Chain = End{10};
+let s: Sequence = c;
+assert(isEnd(s))
