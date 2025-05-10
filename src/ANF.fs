@@ -60,8 +60,8 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         {node with Expr = Rem((substVar lhs var var2), (substVar rhs var var2))}
     | And(lhs, rhs) ->
         {node with Expr = And((substVar lhs var var2), (substVar rhs var var2))}
-    | SCAnd(lhs, rhs) ->
-        {node with Expr = SCAnd((substVar lhs var var2), (substVar rhs var var2))}
+    | ScAnd(lhs, rhs) ->
+        {node with Expr = ScAnd((substVar lhs var var2), (substVar rhs var var2))}
     | Or(lhs, rhs) ->
         {node with Expr = Or((substVar lhs var var2), (substVar rhs var var2))}
     | BNot(arg) ->
@@ -76,8 +76,8 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         {node with Expr = BSL((substVar lhs var var2), (substVar rhs var var2))}
     | BSR(lhs, rhs) ->
         {node with Expr = BSR((substVar lhs var var2), (substVar rhs var var2))}
-    | SCOr(lhs, rhs) ->
-        {node with Expr = Or((substVar lhs var var2), (substVar rhs var var2))}
+    | ScOr(lhs, rhs) ->
+        {node with Expr = ScOr((substVar lhs var var2), (substVar rhs var var2))}
     | Xor(lhs, rhs) ->
         {node with Expr = Xor((substVar lhs var var2), (substVar rhs var var2))}
     | Sqrt(arg) ->
@@ -148,6 +148,13 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         let substCond = substVar cond var var2
         let substBody = substVar body var var2
         {node with Expr = While(substCond, substBody)}
+
+    | For(ident, init, cond, step, body) ->
+        let substCond = substVar cond var var2
+        let substBody = substVar body var var2
+        let substInit = substVar init var var2
+        let substStep = substVar init var var2
+        {node with Expr = For(ident, substInit, substCond, substStep, substBody)}
 
     | Assertion(arg) ->
         {node with Expr = Assertion(substVar arg var var2)}
@@ -237,9 +244,9 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
     | Div(lhs, rhs)
     | Rem(lhs, rhs)
     | And(lhs, rhs)
-    | SCAnd(lhs, rhs)
+    | ScAnd(lhs, rhs)
     | Or(lhs, rhs)
-    | SCOr(lhs, rhs)
+    | ScOr(lhs, rhs)
     | Xor(lhs, rhs)
     | Eq(lhs, rhs)
     | Greater(lhs, rhs)
@@ -261,7 +268,10 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
                       | Add(_,_) -> Add(lhsANF, rhsANF)
                       | Mult(_,_) -> Mult(lhsANF, rhsANF)
                       | And(_,_) -> And(lhsANF, rhsANF)
+                      | ScAnd(_,_) -> ScAnd(lhsANF, rhsANF)
                       | Or(_,_) -> Or(lhsANF, rhsANF)
+                      | ScOr(_,_) -> ScOr(lhsANF, rhsANF)
+                      | Xor(_,_) -> Xor(lhsANF, rhsANF)
                       | Eq(_,_) -> Eq(lhsANF, rhsANF)
                       | Greater(_,_) -> Greater(lhsANF, rhsANF)
                       | LessEq(_,_) -> LessEq(lhsANF, rhsANF)
@@ -410,6 +420,20 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
         let bodyANF = toANF (toANFDefs body)
         /// Definition binding this expression in ANF to its variable
         let anfDef = ANFDef(false, {node with Expr = While(condANF, bodyANF)})
+
+        ({node with Expr = Var(anfDef.Var)}, [anfDef])
+
+    | For(ident, init, cond, step, body) ->
+        /// Condition expression in ANF and related definitions
+        let condANF = toANF (toANFDefs cond)
+        /// Body of the 'while' loop in ANF
+        let bodyANF = toANF (toANFDefs body)
+
+        let initANF = toANF (toANFDefs init)
+
+        let stepANF = toANF (toANFDefs step)
+        /// Definition binding this expression in ANF to its variable
+        let anfDef = ANFDef(false, {node with Expr = For(ident, initANF, condANF, stepANF, bodyANF)})
 
         ({node with Expr = Var(anfDef.Var)}, [anfDef])
     

@@ -219,14 +219,21 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             | Some(env', lhs', rhs') -> Some(env', { node with Expr = And(lhs', rhs') })
             | None -> None
 
-    | SCAnd(lhs, rhs) ->
-        match (lhs.Expr, rhs.Expr) with
-        | (BoolVal(v1), BoolVal(v2)) when v1 -> Some(env, { node with Expr = BoolVal(v1 && v2)})
-        | (BoolVal(v1), BoolVal(v2)) -> Some(env, { node with Expr = BoolVal(false) })
-        | (_, _) ->
-            match (reduceLhsRhs env lhs rhs) with
-            | Some(env', lhs', rhs') -> Some(env', { node with Expr = SCAnd(lhs', rhs') })
+    | ScAnd(lhs, rhs) ->
+        match lhs.Expr with
+        | BoolVal false -> Some(env, { node with Expr = BoolVal false })
+        | BoolVal true ->
+            match reduce env rhs with
+            | Some(env', rhs') -> Some(env', { node with Expr = ScAnd(lhs, rhs') })
+            | None ->
+                match rhs.Expr with
+                | BoolVal v -> Some(env, { node with Expr = BoolVal v })
+                | _ -> None
+        | _ ->
+            match reduce env lhs with
+            | Some(env', lhs') -> Some(env', { node with Expr = ScAnd(lhs', rhs) })
             | None -> None
+
 
     | Or(lhs, rhs) ->
         match (lhs.Expr, rhs.Expr) with
@@ -236,14 +243,22 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             | Some(env', lhs', rhs') -> Some(env', { node with Expr = Or(lhs', rhs') })
             | None -> None
 
-    | SCOr(lhs, rhs) ->
-        match (lhs.Expr, rhs.Expr) with
-        | (BoolVal(v1), BoolVal(v2)) when v1 -> Some(env, { node with Expr = BoolVal(true) })
-        | (BoolVal(v1), BoolVal(v2)) -> Some(env, { node with Expr = BoolVal(v1 || v2) })
-        | (_, _) ->
-            match (reduceLhsRhs env lhs rhs) with
-            | Some(env', lhs', rhs') -> Some(env', { node with Expr = SCOr(lhs', rhs') })
+    | ScOr(lhs, rhs) ->
+        match lhs.Expr with
+        | BoolVal true -> Some(env, { node with Expr = BoolVal true })
+        | BoolVal false ->
+            match reduce env rhs with
+            | Some(env', rhs') -> Some(env', { node with Expr = ScOr(lhs, rhs') })
+            | None ->
+                match rhs.Expr with
+                | BoolVal v -> Some(env, { node with Expr = BoolVal v })
+                | _ -> None
+        | _ ->
+            match reduce env lhs with
+            | Some(env', lhs') -> Some(env', { node with Expr = ScOr(lhs', rhs) })
             | None -> None
+
+
     
     | Xor(lhs, rhs) ->
         match (lhs.Expr, rhs.Expr) with
@@ -292,7 +307,7 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
         | (FloatVal(v1), FloatVal(v2)) -> Some(env, { node with Expr = BoolVal(v1 <= v2) })
         | (_, _) ->
             match (reduceLhsRhs env lhs rhs) with
-            | Some(env', lhs', rhs') -> Some(env', { node with Expr = Less(lhs', rhs') })
+            | Some(env', lhs', rhs') -> Some(env', { node with Expr = LessEq(lhs', rhs') })
             | None -> None
     | Greater(lhs, rhs) ->
         match (lhs.Expr, rhs.Expr) with
@@ -300,7 +315,7 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
         | (FloatVal(v1), FloatVal(v2)) -> Some(env, { node with Expr = BoolVal(v1 > v2) })
         | (_, _) ->
             match (reduceLhsRhs env lhs rhs) with
-            | Some(env', lhs', rhs') -> Some(env', { node with Expr = Less(lhs', rhs') })
+            | Some(env', lhs', rhs') -> Some(env', { node with Expr = Greater(lhs', rhs') })
             | None -> None
     | GreaterEq(lhs, rhs) ->
         match (lhs.Expr, rhs.Expr) with
@@ -308,7 +323,7 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
         | (FloatVal(v1), FloatVal(v2)) -> Some(env, { node with Expr = BoolVal(v1 >= v2) })
         | (_, _) ->
             match (reduceLhsRhs env lhs rhs) with
-            | Some(env', lhs', rhs') -> Some(env', { node with Expr = Less(lhs', rhs') })
+            | Some(env', lhs', rhs') -> Some(env', { node with Expr = GreaterEq(lhs', rhs') })
             | None -> None
 
     | ReadInt ->
@@ -702,6 +717,10 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             If(cond, { body with Expr = Seq([ body; node ]) }, { body with Expr = UnitVal })
 
         Some(env, { node with Expr = rewritten })
+    
+    | For(ident, init, cond, step, body) ->
+        let loop = While(cond, { body with Expr = Seq ([body; step]) })
+        Some(env, { node with Expr = LetMut(ident, init, {body with Expr = loop})})
 
     | Application(expr, args) ->
         match expr.Expr with

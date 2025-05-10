@@ -135,13 +135,16 @@ and Expr<'E, 'T> =
     | And of lhs: Node<'E, 'T> * rhs: Node<'E, 'T>
 
     /// Logical and between lhs and rhs.
-    | SCAnd of lhs: Node<'E, 'T> * rhs: Node<'E, 'T>
-
-    /// Logical and between lhs and rhs.
-    | SCOr of lhs: Node<'E, 'T> * rhs: Node<'E, 'T>
+    | ScAnd of lhs: Node<'E,'T>
+           * rhs: Node<'E,'T>
 
     /// Logical or between lhs and rhs.
-    | Or of lhs: Node<'E, 'T> * rhs: Node<'E, 'T>
+    | Or of lhs: Node<'E,'T>
+          * rhs: Node<'E,'T>
+
+    /// Logical and between lhs and rhs.
+    | ScOr of lhs: Node<'E,'T>
+           * rhs: Node<'E,'T>
 
     /// Logical xor between lhs and rhs.
     | Xor of lhs: Node<'E, 'T> * rhs: Node<'E, 'T>
@@ -222,7 +225,14 @@ and Expr<'E, 'T> =
     | Assign of target: Node<'E, 'T> * expr: Node<'E, 'T>
 
     /// 'While' loop: as long as 'cond' is true, repeat the 'body'.
-    | While of cond: Node<'E, 'T> * body: Node<'E, 'T>
+    | While of cond: Node<'E,'T>
+             * body: Node<'E,'T>
+
+    | For of var: string
+       * init: Node<'E,'T>
+       * cond: Node<'E,'T>
+       * step: Node<'E,'T>
+       * body: Node<'E,'T>
 
     /// Lambda term, i.e. function instance.
     | Lambda of args: List<string * PretypeNode> * body: Node<'E, 'T>

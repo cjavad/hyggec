@@ -51,12 +51,12 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = Sqrt(subst arg var sub)}
     | And(lhs, rhs) ->
         {node with Expr = And((subst lhs var sub), (subst rhs var sub))}
-    | SCAnd(lhs, rhs) ->
-        {node with Expr = SCAnd((subst lhs var sub), (subst rhs var sub))}
+    | ScAnd(lhs, rhs) ->
+        {node with Expr = And((subst lhs var sub), (subst rhs var sub))}
     | Or(lhs, rhs) ->
         {node with Expr = Or((subst lhs var sub), (subst rhs var sub))}
-    | SCOr(lhs, rhs) ->
-        {node with Expr = SCOr((subst lhs var sub), (subst rhs var sub))}
+    | ScOr(lhs, rhs) ->
+        {node with Expr = Or((subst lhs var sub), (subst rhs var sub))}
     | Xor(lhs, rhs) ->
         {node with Expr = Xor((subst lhs var sub), (subst rhs var sub))}
     | Not(arg) ->
@@ -138,6 +138,13 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         let substBody = subst body var sub
         {node with Expr = While(substCond, substBody)}
 
+    | For(ident, init, cond, step, body) ->
+        let substInit = subst init var sub
+        let substCond = subst cond var sub
+        let substStep = subst step var sub
+        let substBody = subst body var sub
+        {node with Expr = For(ident, substInit, substCond, substStep, substBody)}
+
     | Lambda(args, body) ->
         /// Arguments of this lambda term, without their pretypes
         let (argVars, _) = List.unzip args
@@ -195,11 +202,16 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
     | BSL(lhs, rhs)
     | BSR(lhs, rhs)
     | Rem(lhs, rhs) 
+    | BAnd(lhs, rhs)
+    | BOr(lhs, rhs)
+    | BXor(lhs, rhs)
+    | BSL(lhs, rhs)
+    | BSR(lhs, rhs)
     | Sub(lhs, rhs)
     | And(lhs, rhs)
-    | SCAnd(lhs, rhs)
+    | ScAnd(lhs, rhs)
     | Xor(lhs, rhs)
-    | SCOr(lhs, rhs)
+    | ScOr(lhs, rhs)
     | Or(lhs, rhs) ->
         Set.union (freeVars lhs) (freeVars rhs)
     | BNot(arg)
@@ -236,6 +248,7 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
         // Union of the free names of the lhs and the rhs of the assignment
         Set.union (freeVars target) (freeVars expr)
     | While(cond, body) -> Set.union (freeVars cond) (freeVars body)
+    | For(ident, init, cond, step, body) -> Set.union (freeVars cond) (freeVars body)
     | Assertion(arg) -> freeVars arg
     | Syscall(_, args) -> freeVarsInList args
     | Type(_, _, scope) -> freeVars scope
@@ -303,9 +316,9 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         Set.union (capturedVars lhs) (capturedVars rhs)
     | Rem(lhs, rhs) 
     | And(lhs, rhs)
-    | SCAnd(lhs, rhs)
+    | ScAnd(lhs, rhs)
     | Xor(lhs, rhs)
-    | SCOr(lhs, rhs)
+    | ScOr(lhs, rhs)
     | Or(lhs, rhs) ->
         Set.union (capturedVars lhs) (capturedVars rhs)
     | BNot(arg)
@@ -342,6 +355,7 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         // Union of the captured vars of the lhs and the rhs of the assignment
         Set.union (capturedVars target) (capturedVars expr)
     | While(cond, body) -> Set.union (capturedVars cond) (capturedVars body)
+    | For(ident, init, cond, step, body) -> Set.union (capturedVars cond) (capturedVars body)
     | Assertion(arg) -> capturedVars arg
     | Syscall(_, args) -> capturedVarsInList args
     | Type(_, _, scope) -> capturedVars scope

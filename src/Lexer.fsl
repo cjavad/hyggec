@@ -61,9 +61,9 @@ rule tokenize = parse
 | "++"         { Parser.PLUSPLUS}
 | "-"          { Parser.MINUS }
 | "and"        { Parser.AND }
-| "scand"      { Parser.SCAND }
+| "&&"         { Parser.SCAND }
 | "or"         { Parser.OR }
-| "scor"       { Parser.SCOR }
+| "||"         { Parser.SCOR }
 | "xor"        { Parser.XOR }
 | "not"        { Parser.NOT }
 | "="          { Parser.EQ }
@@ -103,6 +103,7 @@ rule tokenize = parse
 | "type"       { Parser.TYPE }
 | "mutable"    { Parser.MUTABLE }
 | "while"      { Parser.WHILE }
+| "for"        { Parser.FOR }
 | "do"         { Parser.DO }
 | "fun"        { Parser.FUN }
 | "struct"     { Parser.STRUCT }

@@ -200,9 +200,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
                                        FPReg.r(env.FPTarget)))
             | t -> failwith $"BUG: unexpected operation %O{t}"
     | And(lhs, rhs)
+    | ScAnd(lhs,rhs)
     | Xor(lhs, rhs)
-    | SCAnd(lhs, rhs)
-    | SCOr(lhs, rhs)
+    | ScOr(lhs, rhs)
     | Or(lhs, rhs) as expr ->
         // Code generation for logical 'and' and 'or' is very similar: we
         // compile the lhs and rhs giving them different target registers, and
@@ -218,14 +218,44 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
         /// Generated code for the logical operation
         let opAsm =
             match expr with
-            | And(_, _) -> Asm(RV.AND(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
-            | Or(_, _) -> Asm(RV.OR(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
-            | Xor(_, _) -> Asm(RV.XOR(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
-            | SCAnd(_, _) -> Asm(RV.AND(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
-            | SCOr(_, _) -> Asm(RV.OR(Reg.r (env.Target), Reg.r (env.Target), Reg.r (rtarget)))
+            | And(_,_) ->
+                Asm(RV.AND(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | ScAnd(_,_) ->
+                let falseLabel = Util.genSymbol "scand_false"
+                let endLabel = Util.genSymbol "scand_end"
+                lAsm ++
+                Asm(RV.BEQ(Reg.r(env.Target), Reg.zero, falseLabel),"jump to false if lhs false") ++
+                rAsm ++
+                Asm([
+                    RV.MV(Reg.r(env.Target), Reg.r(rtarget)), "move rhs to target";
+                    RV.J(endLabel), "jump to end";
+                    RV.LABEL falseLabel, "false";
+                    RV.LI(Reg.r(env.Target), 0), "set register false";
+                    RV.LABEL endLabel, "end"
+                ])
+            | Or(_,_) ->
+                Asm(RV.OR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
+            | ScOr(_,_) ->
+                let trueLabel = Util.genSymbol "scor_true"
+                let endLabel = Util.genSymbol "scor_end"
+                lAsm ++
+                Asm(RV.BNE(Reg.r(env.Target), Reg.zero, trueLabel), "jump to true if rhs true") ++
+                rAsm ++
+                Asm([
+                    RV.MV(Reg.r(env.Target), Reg.r(rtarget)), "move rhs to target"; 
+                    RV.J(endLabel), "jump to end";
+                    RV.LABEL trueLabel, "true";
+                    RV.LI(Reg.r(env.Target), 1), "set to true";
+                    RV.LABEL endLabel, "end"
+                ])
+            | Xor(_,_) ->
+                Asm(RV.XOR(Reg.r(env.Target), Reg.r(env.Target), Reg.r(rtarget)))
             | x -> failwith $"BUG: unexpected operation %O{x}"
         // Put everything together
-        lAsm ++ rAsm ++ opAsm
+        match expr with 
+        | ScAnd _ 
+        | ScOr _ -> opAsm
+        | _ -> lAsm ++ rAsm ++ opAsm
 
     | Not(arg) ->
         /// Generated code for the argument expression (note that we don't need
@@ -235,6 +265,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
     | Neg(arg) ->
         let asm = doCodegen env arg
         asm.AddText(RV.NEG(Reg.r (env.Target), Reg.r (env.Target)))
+
     | Eq(lhs, rhs)
     | Greater(lhs, rhs)
     | LessEq(lhs, rhs)
@@ -285,6 +316,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
                 match expr with
                 | Eq(_, _) -> Asm(RV.BEQ(Reg.r (env.Target), Reg.r (rtarget), trueLabel))
                 | Less(_, _) -> Asm(RV.BLT(Reg.r (env.Target), Reg.r (rtarget), trueLabel))
+                | LessEq(_, _) -> Asm(RV.BGE(Reg.r (rtarget), Reg.r (env.Target), trueLabel))
+                | Greater(_, _) -> Asm(RV.BLT(Reg.r (rtarget), Reg.r (env.Target), trueLabel))
+                | GreaterEq(_, _) -> Asm(RV.BGE(Reg.r (env.Target), Reg.r (rtarget), trueLabel))
                 | x -> failwith $"BUG: unexpected operation %O{x}"
 
             // Put everything together
@@ -308,8 +342,8 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
                 | Eq(_, _) -> Asm(RV.FEQ_S(Reg.r (env.Target), FPReg.r (env.FPTarget), FPReg.r (rfptarget)))
                 | Less(_, _) -> Asm(RV.FLT_S(Reg.r (env.Target), FPReg.r (env.FPTarget), FPReg.r (rfptarget)))
                 | LessEq(_, _) -> Asm(RV.FLE_S(Reg.r (env.Target), FPReg.r (env.FPTarget), FPReg.r (rfptarget)))
-                | Greater(_, _) -> Asm(RV.FLE_S(Reg.r (env.Target), FPReg.r (rfptarget), FPReg.r (env.FPTarget)))
-                | GreaterEq(_, _) -> Asm(RV.FLT_S(Reg.r (env.Target), FPReg.r (rfptarget), FPReg.r (env.FPTarget)))
+                | Greater(_, _) -> Asm(RV.FLT_S(Reg.r (env.Target), FPReg.r (rfptarget), FPReg.r (env.FPTarget)))
+                | GreaterEq(_, _) -> Asm(RV.FLE_S(Reg.r (env.Target), FPReg.r (rfptarget), FPReg.r (env.FPTarget)))
                 | x -> failwith $"BUG: unexpected operation %O{x}"
             // Put everything together
             (lAsm ++ rAsm ++ opAsm)
@@ -789,20 +823,48 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
         // address --- and this can be important if the compilation of 'body'
         // produces a large amount of assembly code
         Asm(RV.LABEL(whileBeginLabel))
-        ++ (doCodegen env cond)
-            .AddText(
-                [ (RV.BNEZ(Reg.r (env.Target), whileBodyBeginLabel), "Jump to loop body if 'while' condition is true")
-                  (RV.LA(Reg.r (env.Target), whileEndLabel), "Load address of label at the end of the 'while' loop")
-                  (RV.JR(Reg.r (env.Target)), "Jump to the end of the loop")
-                  (RV.LABEL(whileBodyBeginLabel), "Body of the 'while' loop starts here") ]
-            )
-        ++ (doCodegen env body)
-            .AddText(
-                [ (RV.LA(Reg.r (env.Target), whileBeginLabel),
-                   "Load address of label at the beginning of the 'while' loop")
-                  (RV.JR(Reg.r (env.Target)), "Jump to the end of the loop")
-                  (RV.LABEL(whileEndLabel), "") ]
-            )
+            ++ (doCodegen env cond)
+                .AddText([
+                    (RV.BNEZ(Reg.r(env.Target), whileBodyBeginLabel),
+                     "Jump to loop body if 'while' condition is true")
+                    (RV.LA(Reg.r(env.Target), whileEndLabel),
+                     "Load address of label at the end of the 'while' loop")
+                    (RV.JR(Reg.r(env.Target)), "Jump to the end of the loop")
+                    (RV.LABEL(whileBodyBeginLabel),
+                     "Body of the 'while' loop starts here")
+                ])
+            ++ (doCodegen env body)
+            .AddText([
+                (RV.LA(Reg.r(env.Target), whileBeginLabel),
+                 "Load address of label at the beginning of the 'while' loop")
+                (RV.JR(Reg.r(env.Target)), "Jump to the end of the loop")
+                (RV.LABEL(whileEndLabel), "")
+            ])
+    
+    | For(ident, init, cond, step, body) ->
+        let forBeginLabel = Util.genSymbol "for_loop_begin"
+        let forBodyBeginLabel = Util.genSymbol "for_body_begin"
+        let forEndLabel = Util.genSymbol "for_loop_end"
+
+        let initCode = doCodegen env init
+        let scopeTarget = env.Target + 1u
+        let scopeVarStorage = env.VarStorage.Add(ident, Storage.Reg(Reg.r(env.Target)))
+        let scopeEnv = { env with Target = scopeTarget; VarStorage = scopeVarStorage }
+
+        initCode ++
+        Asm(RV.LABEL(forBeginLabel)) ++
+        (doCodegen scopeEnv cond)
+            .AddText([
+            (RV.BEQZ(Reg.r(env.Target+1u), forEndLabel), "Exit 'for' loop if condition is false")
+            (RV.LABEL(forBodyBeginLabel), "'for' loop body begins")
+            ]
+        ) ++
+        (doCodegen scopeEnv body)
+            .AddText(RV.COMMENT("Loop body complete")) ++
+        (doCodegen scopeEnv step) ++
+        Asm(RV.J(forBeginLabel)) ++
+        Asm(RV.LABEL(forEndLabel))
+
 
     | Lambda(args, body) ->
         /// Label to mark the position of the lambda term body

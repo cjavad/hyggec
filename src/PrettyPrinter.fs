@@ -147,15 +147,15 @@ let rec internal formatASTRec (node: AST.Node<'E, 'T>) : Tree =
     | And(lhs, rhs) ->
         mkTree "And" node [("lhs", formatASTRec lhs)
                            ("rhs", formatASTRec rhs)]
-    | SCAnd(lhs, rhs) ->
-        mkTree "SCAnd" node [("lhs", formatASTRec lhs)
-                             ("rhs", formatASTRec rhs)]
+    | ScAnd(lhs, rhs) ->
+        mkTree "And" node [("lhs", formatASTRec lhs)
+                           ("rhs", formatASTRec rhs)]
     | Or(lhs, rhs) ->
         mkTree "Or" node [("lhs", formatASTRec lhs)
                           ("rhs", formatASTRec rhs)]
-    | SCOr(lhs, rhs) ->
-        mkTree "SCOr" node [("lhs", formatASTRec lhs)
-                            ("rhs", formatASTRec rhs)]
+    | ScOr(lhs, rhs) ->
+        mkTree "Or" node [("lhs", formatASTRec lhs)
+                          ("rhs", formatASTRec rhs)]
     | Xor(lhs, rhs) ->
         mkTree "Xor" node [("lhs", formatASTRec lhs)
                            ("rhs", formatASTRec rhs)]
@@ -216,9 +216,19 @@ let rec internal formatASTRec (node: AST.Node<'E, 'T>) : Tree =
               ("init", formatASTRec init)
               ("scope", formatASTRec scope) ]
     | LetMut(name, init, scope) ->
-        mkTree $"Let mutable %s{name}" node [ ("init", formatASTRec init); ("scope", formatASTRec scope) ]
-    | Assign(target, expr) -> mkTree $"Assign" node [ ("target", formatASTRec target); ("expr", formatASTRec expr) ]
-    | While(cond, body) -> mkTree $"While" node [ ("cond", formatASTRec cond); ("body", formatASTRec body) ]
+        mkTree $"Let mutable %s{name}" node [("init", formatASTRec init)
+                                             ("scope", formatASTRec scope)]
+    | Assign(target, expr) ->
+        mkTree $"Assign" node [("target", formatASTRec target)
+                               ("expr", formatASTRec expr)]
+    | While(cond, body) ->
+        mkTree $"While" node [("cond", formatASTRec cond)
+                              ("body", formatASTRec body)]
+    | For(var, init, cond, step, body) ->
+        mkTree $"For" node [("init", formatASTRec init)
+                            ("cond", formatASTRec cond)
+                            ("step", formatASTRec step)
+                            ("body", formatASTRec body)]
     | Lambda(args, body) ->
         /// Formatted arguments with their pretype
         let argChildren = List.map (fun (v, t) -> ($"arg %s{v}", formatPretypeNode t)) args
