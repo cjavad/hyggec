@@ -265,6 +265,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
     | Neg(arg) ->
         let asm = doCodegen env arg
         asm.AddText(RV.NEG(Reg.r (env.Target), Reg.r (env.Target)))
+
     | Eq(lhs, rhs)
     | Greater(lhs, rhs)
     | LessEq(lhs, rhs)
@@ -315,6 +316,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
                 match expr with
                 | Eq(_, _) -> Asm(RV.BEQ(Reg.r (env.Target), Reg.r (rtarget), trueLabel))
                 | Less(_, _) -> Asm(RV.BLT(Reg.r (env.Target), Reg.r (rtarget), trueLabel))
+                | LessEq(_, _) -> Asm(RV.BGE(Reg.r (rtarget), Reg.r (env.Target), trueLabel))
+                | Greater(_, _) -> Asm(RV.BLT(Reg.r (rtarget), Reg.r (env.Target), trueLabel))
+                | GreaterEq(_, _) -> Asm(RV.BGE(Reg.r (env.Target), Reg.r (rtarget), trueLabel))
                 | x -> failwith $"BUG: unexpected operation %O{x}"
 
             // Put everything together
@@ -338,8 +342,8 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
                 | Eq(_, _) -> Asm(RV.FEQ_S(Reg.r (env.Target), FPReg.r (env.FPTarget), FPReg.r (rfptarget)))
                 | Less(_, _) -> Asm(RV.FLT_S(Reg.r (env.Target), FPReg.r (env.FPTarget), FPReg.r (rfptarget)))
                 | LessEq(_, _) -> Asm(RV.FLE_S(Reg.r (env.Target), FPReg.r (env.FPTarget), FPReg.r (rfptarget)))
-                | Greater(_, _) -> Asm(RV.FLE_S(Reg.r (env.Target), FPReg.r (rfptarget), FPReg.r (env.FPTarget)))
-                | GreaterEq(_, _) -> Asm(RV.FLT_S(Reg.r (env.Target), FPReg.r (rfptarget), FPReg.r (env.FPTarget)))
+                | Greater(_, _) -> Asm(RV.FLT_S(Reg.r (env.Target), FPReg.r (rfptarget), FPReg.r (env.FPTarget)))
+                | GreaterEq(_, _) -> Asm(RV.FLE_S(Reg.r (env.Target), FPReg.r (rfptarget), FPReg.r (env.FPTarget)))
                 | x -> failwith $"BUG: unexpected operation %O{x}"
             // Put everything together
             (lAsm ++ rAsm ++ opAsm)
