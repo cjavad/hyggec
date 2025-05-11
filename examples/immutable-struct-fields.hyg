@@ -1,3 +1,2 @@
-let x: struct { a: int } = struct { a = 1 };
-x.a <- 2;
+let x: struct { immutable a: int } = struct { a = 1 };
 println(x.a)

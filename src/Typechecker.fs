@@ -201,7 +201,11 @@ let rec isSubtypeOf (env: TypingEnv) (A: Set<Type * Type>) (t1: Type) (t2: Type)
             let (fieldMutables1, fieldNames1, fieldTypes1) = List.unzip3 fields1'
             let (fieldMutables2, fieldNames2, fieldTypes2) = List.unzip3 fields2
 
-            if (fieldMutables1 <> fieldMutables2) || (fieldNames1 <> fieldNames2) then
+            let mutableSubtype =
+                List.zip fieldMutables1 fieldMutables2
+                |> List.forall (fun (m1, m2) -> not m2 || m1)
+
+            if not mutableSubtype || (fieldNames1 <> fieldNames2) then
                 false
             else
                 let newA = A.Add(t1,t2)
