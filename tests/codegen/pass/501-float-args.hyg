@@ -1,0 +1,11 @@
+fun f(a: float, b: int): float = {
+  a
+};
+
+assert(f(1.0f + 2.0f, 0) = 3.0f);
+
+fun g(b: int, a: float): float = {
+  a
+};
+
+assert(g(0, 1.0f + 2.0f) = 3.0f)
