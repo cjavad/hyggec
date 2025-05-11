@@ -65,7 +65,9 @@ let rec internal formatType (t: Type.Type) : Tree =
         Node("fun", (argChildren @ [ ("return", formatType ret) ]))
     | Type.TStruct(fields) ->
         /// Formatted fields with their respective type
-        let fieldsChildren = List.map (fun (f, t) -> ($"field %s{f}", formatType t)) fields
+        let fieldsChildren = List.map (fun (m, f, t) -> 
+            let m = if m then "mutable " else ""
+            ($"%s{m} field %s{f}", formatType t)) fields
         Node("struct", fieldsChildren)
     | Type.TUnion(cases) ->
         /// Formatted case labels with their respective type
@@ -257,7 +259,7 @@ let rec internal formatASTRec (node: AST.Node<'E, 'T>) : Tree =
     | StructCons(fields) ->
         /// Formatted fields of the structure
         let fieldsChildren =
-            List.map (fun (f, n) -> ($"field %s{f}", formatASTRec n)) fields
+            List.map (fun (_m, f, n) -> ($"field %s{f}", formatASTRec n)) fields
 
         mkTree "StructCons" node fieldsChildren
     | FieldSelect(target, field) -> mkTree $"FieldSelect %s{field}" node [ ("expr", formatASTRec target) ]
@@ -315,7 +317,8 @@ and internal formatPretypeNode (node: PretypeNode) : Tree =
     | Pretype.TStruct(fields) ->
         /// Formatted pretypes of each field with their respective field name
         let fieldsChildren =
-            List.map (fun (name, t) -> ((formatPretypeDescr t $"field %s{name}"), formatPretypeNode t)) fields
+            fields
+            |> List.map (fun (_, name, t) -> ((formatPretypeDescr t $"field %s{name}"), formatPretypeNode t)) 
 
         Node((formatPretypeDescr node "Struct pretype"), fieldsChildren)
     | Pretype.TUnion(cases) ->

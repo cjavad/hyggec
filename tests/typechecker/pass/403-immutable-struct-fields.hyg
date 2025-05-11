@@ -1,0 +1,3 @@
+let x = struct { a = 0 };
+x.a <- 1;
+assert(x.a = 1)

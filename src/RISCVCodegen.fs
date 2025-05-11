@@ -771,7 +771,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
             match (expandType target.Env target.Type) with
             | TStruct(fields) ->
                 /// Names of the struct fields
-                let (fieldNames, _) = List.unzip fields
+                let (_, fieldNames, _) = List.unzip3 fields
                 /// Offset of the selected struct field from the beginning of
                 /// the struct
                 let offset = List.findIndex (fun f -> f = field) fieldNames
@@ -988,7 +988,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
         // The struct heap address will end up in the 'target' register - i.e.
         // the register will contain a pointer to the first element of the
         // allocated structure
-        let (fieldNames, fieldInitNodes) = List.unzip fields
+        let (_, fieldNames, fieldInitNodes) = List.unzip3 fields
 
         /// Generate the code that initialises a struct field, and accumulates
         /// the result.  This function is folded over all indexed struct fields,
@@ -1056,7 +1056,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
         let fieldAccessCode =
             match (expandType node.Env target.Type) with
             | TStruct(fields) ->
-                let (fieldNames, fieldTypes) = List.unzip fields
+                let (_, fieldNames, fieldTypes) = List.unzip3 fields
                 let offset = List.findIndex (fun f -> f = field) fieldNames
 
                 match fieldTypes.[offset] with

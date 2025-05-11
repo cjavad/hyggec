@@ -780,11 +780,11 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             | None -> None
 
     | StructCons(fields) ->
-        let (fieldNames, fieldNodes) = List.unzip fields
+        let (fieldMutables, fieldNames, fieldNodes) = List.unzip3 fields
 
         match (reduceList env fieldNodes) with
         | Some(env', fieldNodes') ->
-            let fields' = List.zip fieldNames fieldNodes'
+            let fields' = List.zip3 fieldMutables fieldNames fieldNodes'
             Some(env', { node with Expr = StructCons(fields') })
         | None ->
             // If all struct entries are values, place them on the heap in

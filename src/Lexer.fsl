@@ -109,6 +109,7 @@ rule tokenize = parse
 | "syscall"    { Parser.SYSCALL }
 | "type"       { Parser.TYPE }
 | "mutable"    { Parser.MUTABLE }
+| "immutable"  { Parser.IMMUTABLE }
 | "while"      { Parser.WHILE }
 | "for"        { Parser.FOR }
 | "do"         { Parser.DO }

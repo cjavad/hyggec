@@ -1,0 +1,3 @@
+let x: struct { a: int } = struct { a = 1 };
+x.a <- 2;
+println(x.a)

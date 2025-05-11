@@ -50,7 +50,7 @@ and Pretype =
     /// A function pretype, with argument pretypes and return pretype.
     | TFun of args: List<PretypeNode> * ret: PretypeNode
     /// A structure pretype, with pretypes for each field.
-    | TStruct of fields: List<string * PretypeNode>
+    | TStruct of fields: List<bool * string * PretypeNode>
     /// Discriminated union type.  Each case consists of a name and a pretype.
     | TUnion of cases: List<string * PretypeNode>
     /// An array pretype, with pretypes for the elements WIP
@@ -258,7 +258,7 @@ and Expr<'E, 'T> =
 
     /// Constructor of a structure instance: each field has a name and a
     /// corresponding AST child.
-    | StructCons of fields: List<string * Node<'E, 'T>>
+    | StructCons of fields: List<bool * string * Node<'E, 'T>>
 
     /// Access a field of a target expression (e.g. a structure).
     | FieldSelect of target: Node<'E, 'T> * field: string

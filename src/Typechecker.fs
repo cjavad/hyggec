@@ -102,7 +102,7 @@ let rec internal resolvePretype (env: TypingEnv) (pt: AST.PretypeNode) : Result<
             Ok(TFun(argTypes, returnType))
     | Pretype.TStruct(fields) ->
         /// Struct field names and pretypes
-        let (fieldNames, fieldPretypes) = List.unzip fields
+        let (fieldMutables, fieldNames, fieldPretypes) = List.unzip3 fields
         /// List of duplicate field names
         let dups = Util.duplicates fieldNames
 
@@ -119,7 +119,7 @@ let rec internal resolvePretype (env: TypingEnv) (pt: AST.PretypeNode) : Result<
             else
                 /// Type of each struct field
                 let fieldTypes = List.map getOkValue fieldTypes
-                Ok(TStruct(List.zip fieldNames fieldTypes))
+                Ok(TStruct(List.zip3 fieldMutables fieldNames fieldTypes))
     | Pretype.TUnion(cases) ->
         /// Union type labels and pretypes
         let (caseLabels, casePretypes) = List.unzip cases
@@ -198,10 +198,10 @@ let rec isSubtypeOf (env: TypingEnv) (A: Set<Type * Type>) (t1: Type) (t2: Type)
                 /// fields of the supertype struct: we only check whether these
                 /// fields are compatible (the subtype can have more fields)
             let fields1' = fields1[0 .. (fields2.Length - 1)]
-            let (fieldNames1, fieldTypes1) = List.unzip fields1'
-            let (fieldNames2, fieldTypes2) = List.unzip fields2
+            let (fieldMutables1, fieldNames1, fieldTypes1) = List.unzip3 fields1'
+            let (fieldMutables2, fieldNames2, fieldTypes2) = List.unzip3 fields2
 
-            if (fieldNames1 <> fieldNames2) then
+            if (fieldMutables1 <> fieldMutables2) || (fieldNames1 <> fieldNames2) then
                 false
             else
                 let newA = A.Add(t1,t2)
@@ -662,9 +662,22 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
                           Expr = Assign(ttarget, texpr) }
                 else
                     Error([ (node.Pos, $"assignment to non-mutable variable %s{name}") ])
-            | FieldSelect(_, _) ->
-                Ok { Pos = node.Pos; Env = env; Type = ttarget.Type;
-                     Expr = Assign(ttarget, texpr) }
+            | FieldSelect(n, name) ->
+                match n.Type with
+                | TStruct(fields) ->
+                    let isMutable = 
+                        fields
+                        |> List.tryFind (fun (m, n, _) -> m && n = name)
+
+                    match isMutable with
+                    | Some(_) ->
+                        Ok { Pos = node.Pos; Env = env; Type = ttarget.Type;
+                             Expr = Assign(ttarget, texpr) }
+                    | None ->
+                        Error([ (node.Pos, $"assignment to non-mutable field %s{name}") ])
+                | _ ->
+                    Ok { Pos = node.Pos; Env = env; Type = ttarget.Type;
+                         Expr = Assign(ttarget, texpr) }
             | ArrayElem(_, _) ->
                 Ok { Pos = node.Pos; Env = env; Type = ttarget.Type;
                      Expr = Assign(ttarget, texpr) }
@@ -810,7 +823,7 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
         | Error(es) -> Error(es)
 
     | StructCons(fields) ->
-        let (fieldNames, fieldNodes) = List.unzip fields
+        let (fieldMutables, fieldNames, fieldNodes) = List.unzip3 fields
         let dups = Util.duplicates fieldNames
 
         if not (dups.IsEmpty) then
@@ -828,9 +841,9 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
                 /// Types of each struct field (derived from their init expr)
                 let fieldTypes = List.map (fun (t: TypedAST) -> t.Type) typedInits
                 /// Pairs of field names and their respective type
-                let fieldNamesTypes = List.zip fieldNames fieldTypes
+                let fieldNamesTypes = List.zip3 fieldMutables fieldNames fieldTypes
                 /// Pairs of field names and typed AST node of init expression
-                let fieldsTypedInits = List.zip fieldNames typedInits
+                let fieldsTypedInits = List.zip3 fieldMutables fieldNames typedInits
 
                 Ok
                     { Pos = node.Pos
@@ -843,7 +856,7 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
         | Ok(texpr) ->
             match (expandType env texpr.Type) with
             | TStruct(fields) ->
-                let (fieldNames, fieldTypes) = List.unzip fields
+                let (_fieldMutables, fieldNames, fieldTypes) = List.unzip3 fields
 
                 if not (List.contains field fieldNames) then
                     Error([ (node.Pos, $"struct has no field called '%s{field}'") ])

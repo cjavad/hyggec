@@ -184,9 +184,9 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         {node with Expr = Application(substExpr, substArgs)}
 
     | StructCons(fields) ->
-        let (fieldNames, initNodes) = List.unzip fields
+        let (fieldMutables, fieldNames, initNodes) = List.unzip3 fields
         let substInitNodes = List.map (fun e -> (substVar e var var2)) initNodes
-        {node with Expr = StructCons(List.zip fieldNames substInitNodes)}
+        {node with Expr = StructCons(List.zip3 fieldMutables fieldNames substInitNodes)}
 
     | FieldSelect(target, field) ->
         {node with Expr = FieldSelect((substVar target var var2), field)}
@@ -498,11 +498,11 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
          anfDef :: List.concat (List.rev argsDefs) @ appExprDefs)
 
     | StructCons(fields) ->
-        let (fieldNames, fieldNodes) = List.unzip fields
+        let (fieldMutables, fieldNames, fieldNodes) = List.unzip3 fields
         /// Struct fields in ANF and related definitions
         let (fieldsANF, fieldsDefs) = List.unzip (List.map toANFDefs fieldNodes)
         /// Updated structure fields (names and nodes) in ANF
-        let fields2 = List.zip fieldNames fieldsANF
+        let fields2 = List.zip3 fieldMutables fieldNames fieldsANF
         /// Definition binding this expression in ANF to its variable
         let anfDef = ANFDef(false, {node with Expr = StructCons(fields2)})
 

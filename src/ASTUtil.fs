@@ -168,9 +168,9 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = Application(substExpr, substArgs)}
 
     | StructCons(fields) ->
-        let (fieldNames, initNodes) = List.unzip fields
+        let (fieldMutables, fieldNames, initNodes) = List.unzip3 fields
         let substInitNodes = List.map (fun e -> (subst e var sub)) initNodes
-        {node with Expr = StructCons(List.zip fieldNames substInitNodes)}
+        {node with Expr = StructCons(List.zip3 fieldMutables fieldNames substInitNodes)}
 
     | FieldSelect(target, field) ->
         {node with Expr = FieldSelect((subst target var sub), field)}
@@ -278,7 +278,7 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
         // Union of free variables in the applied expr, plus all its arguments
         Set.union (freeVars expr) (freeVarsInList args)
     | StructCons(fields) ->
-        let (_, nodes) = List.unzip fields
+        let (_, _, nodes) = List.unzip3 fields
         freeVarsInList nodes
     | FieldSelect(expr, _) -> freeVars expr
     | UnionCons(_, expr) -> freeVars expr
@@ -385,7 +385,7 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         // Union of captured variables in the applied expr, plus all arguments
         Set.union (capturedVars expr) (capturedVarsInList args)
     | StructCons(fields) ->
-        let (_, nodes) = List.unzip fields
+        let (_, _, nodes) = List.unzip3 fields
         capturedVarsInList nodes
     | FieldSelect(expr, _) -> capturedVars expr
     | UnionCons(_, expr) -> capturedVars expr
