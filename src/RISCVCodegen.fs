@@ -1270,16 +1270,16 @@ and internal deepCopy (env: CodegenEnv) (arg: Node<TypingEnv, Type>): Asm =
 
         match (expandType arg.Env arg.Type) with
         | TStruct(fields) ->
-            let (fieldNames, fieldTypes) = List.unzip fields
+            let (muta, fieldNames, fieldTypes) = List.unzip3 fields
 
-            let folder ((offset, field): int * string) (nodes: List<string * Node<TypingEnv, Type>>): List<string * Node<TypingEnv, Type>> = 
+            let folder ((offset, field): int * string) (nodes: List<bool * string * Node<TypingEnv, Type>>): List<bool * string * Node<TypingEnv, Type>> = 
                 let node' = { arg with Expr = match fieldTypes.[offset] with
                                                 | TStruct(_)
                                                 | TVar(_) -> Copy(arg = {{arg with Expr = FieldSelect(target = arg, field = field)} with Type = fieldTypes.[offset]})
                                                 | _ -> FieldSelect(target = arg, field = field)}
-                (field, {node' with Type = fieldTypes.[offset]}) :: nodes
+                (muta.Item offset, field, {node' with Type = fieldTypes.[offset]}) :: nodes
 
-            let fieldNodes: List<string * Node<TypingEnv, Type>> = List.foldBack folder (List.indexed fieldNames) []
+            let fieldNodes: List<bool * string * Node<TypingEnv, Type>> = List.foldBack folder (List.indexed fieldNames) []
 
             doCodegen env {arg with Expr = StructCons(fields = fieldNodes)}
 

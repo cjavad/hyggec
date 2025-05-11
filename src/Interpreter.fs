@@ -935,36 +935,40 @@ and internal deepCopy (renv': RuntimeEnv<'E, 'T>) (node': Node<'E, 'T>): Option<
         | FloatVal(_)
         | StringVal(_) -> Some(renv, node)
         | StructCons(fields) -> 
-            let (fieldNames, fieldNodes) = List.unzip fields
+            let (muta, fieldNames, fieldNodes) = List.unzip3 fields
             let folder (node: Node<'E, 'T>) ((env, nodes): RuntimeEnv<'E, 'T> * List<Node<'E, 'T>>) : RuntimeEnv<'E, 'T> * List<Node<'E, 'T>> =
                 match dCopy env node with
                 | Some(nenv, n) -> (nenv, n :: nodes)
                 | None -> failwith "Error copying node"
 
             let (env', fieldNodes') = List.foldBack folder fieldNodes (renv, [])
-            let fields' = List.zip fieldNames fieldNodes'
+            let fields' = List.zip3 muta fieldNames fieldNodes'
             Some(env', { node with Expr = StructCons(fields') }) 
         | Pointer(baseAddr) -> 
             match (renv.PtrInfo.TryFind baseAddr) with
-            | Some(fieldNames) ->
-                let folder ((offset, field): int * String) ((env, nodes): RuntimeEnv<'E, 'T> * List<Node<'E, 'T>>) : RuntimeEnv<'E, 'T> * List<Node<'E, 'T>> = 
-                    let node = env.Heap[baseAddr + (uint offset)]
-                    match dCopy env node with
-                    | Some(nenv, n) -> (nenv, n :: nodes)
-                    | None -> failwith "Error copying node" 
+            | None -> None                
+            | Some(info) ->
+                match info with                
+                | Arraylen(_) -> failwith "Not Implemented"
+                | StructFields(fieldNames) ->            
+                    let folder ((offset, field): int * String) ((env, nodes): RuntimeEnv<'E, 'T> * List<Node<'E, 'T>>) : RuntimeEnv<'E, 'T> * List<Node<'E, 'T>> = 
+                        let node = env.Heap[baseAddr + (uint offset)]
+                        match dCopy env node with
+                        | Some(nenv, n) -> (nenv, n :: nodes)
+                        | None -> failwith "Error copying node" 
 
-                let (env, fieldNodes) = List.foldBack folder (List.indexed fieldNames) (renv, [])
+                    let (env, fieldNodes) = List.foldBack folder (List.indexed fieldNames) (renv, [])
 
-                let (heap, baseAddr') = heapAlloc env.Heap fieldNodes
-                let ptrInfo' = env.PtrInfo.Add(baseAddr', fieldNames)
+                    let (heap, baseAddr') = heapAlloc env.Heap fieldNodes
+                    let ptrInfo' = env.PtrInfo.Add(baseAddr', StructFields(fieldNames))
 
-                Some(
-                    { env with
-                        Heap = heap
-                        PtrInfo = ptrInfo' },
-                    { node with Expr = Pointer(baseAddr') }
-                )
-            | None -> None
+                    Some(
+                        { env with
+                            Heap = heap
+                            PtrInfo = ptrInfo' },
+                        { node with Expr = Pointer(baseAddr') }
+                    )
+                
             
         | _ -> failwith "not implemented"
 
