@@ -1320,8 +1320,6 @@ and internal compileFunction (args: List<string * Type>) (body: TypedAST) (env: 
         .AddText(RV.JR(Reg.ra), "End of function, return to caller")
 
 and internal deepCopy (env: CodegenEnv) (arg: Node<TypingEnv, Type>): Asm = 
-        let argCode = doCodegen env arg
-
         match (expandType arg.Env arg.Type) with
         | TStruct(fields) ->
             let (muta, fieldNames, fieldTypes) = List.unzip3 fields
