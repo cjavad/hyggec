@@ -27,6 +27,9 @@ type internal Storage =
     /// The variable is stored in memory, in a location marked with a
     /// label in the compiled assembly code.
     | Label of label: string
+    /// The variable is stored on the stack, at a given offset from the
+    /// top of the stack.
+    | Frame of offset: int
 
 
 /// Code generation environment.
@@ -95,6 +98,13 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
                       (RV.LW(Reg.r (env.Target), Imm12(0), Reg.r (env.Target)), $"Load value of variable '%s{name}'")
                       (RV.FMV_W_X(FPReg.r (env.FPTarget), Reg.r (env.Target)), $"Transfer '%s{name}' to fp register") ]
                 )
+            | Some(Storage.Frame(offset)) ->
+                // Load float from stack
+                Asm([
+                    (RV.LW(Reg.r (env.Target), Imm12(offset), Reg.sp), $"Load address of variable '%s{name}'")
+                    (RV.FMV_W_X(FPReg.r (env.FPTarget), Reg.r (env.Target)), $"Transfer '%s{name}' to fp register")
+                ])
+                
             | Some(Storage.Reg(_)) as st ->
                 failwith $"BUG: variable %s{name} of type %O{t} has unexpected storage %O{st}"
             | None -> failwith $"BUG: float variable without storage: %s{name}"
@@ -109,6 +119,11 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
                         [ (RV.LA(Reg.r (env.Target), lab), $"Load address of variable '%s{name}'")
                           (RV.LW(Reg.r (env.Target), Imm12(0), Reg.r (env.Target)), $"Load value of variable '%s{name}'") ]
                     )
+            | Some(Storage.Frame(offset)) ->
+                // Load int from stack
+                Asm([
+                    (RV.LW(Reg.r (env.Target), Imm12(offset), Reg.sp), $"Load address of variable '%s{name}'")
+                ])
             | Some(Storage.FPReg(_)) as st ->
                 failwith $"BUG: variable %s{name} of type %O{t} has unexpected storage %O{st}"
             | None -> failwith $"BUG: variable without storage: %s{name}"
@@ -760,6 +775,8 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
                               (RV.SW(Reg.r (env.Target), Imm12(0), Reg.r (env.Target + 1u)),
                                $"Transfer value of '%s{name}' to memory") ]
                         )
+                | Some(Storage.Frame(offset)) ->
+                    failwith "TODO: Cannot assign to a storage frame (yet), only used for arguments atm."
                 | None -> failwith $"BUG: variable without storage: %s{name}"
         | FieldSelect(target, field) ->
             /// Assembly code for computing the 'target' object of which we are
@@ -948,6 +965,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
         let indexedArgs = List.indexed intArgs
         let indexedFloatArgs = List.indexed floatArgs
 
+        let intRegsStackCount = if intArgs.Length > 8 then intArgs.Length - 8 else 0
+        let floatRegsStackCount = if floatArgs.Length > 8 then floatArgs.Length - 8 else 0
+        
         /// Function that compiles an argument (using its index to determine its
         /// target register) and accumulates the generated assembly code
         let compileArg (isFloat) (acc: Asm) (i, arg)  =
@@ -964,22 +984,39 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
         /// 'indexedArgs'
         let argsCode = List.fold (compileArg false) (Asm()) indexedArgs
                        ++ List.fold (compileArg true) (Asm()) indexedFloatArgs
-
+                       
+      
         /// Function that copies the content of a target register (used by
         /// 'compileArgs' and 'argsCode' above) into an 'a' register, using an
         /// index to determine the source and target registers, and accumulating
         /// the generated assembly code
         let copyArg (isFloat) (acc: Asm) (i: int) =
             match isFloat with
-            | true ->
+            | true when i < 8 ->
                 acc.AddText(
                     RV.FMV_S(FPReg.fa (uint i), FPReg.r (env.FPTarget + (uint i) + 1u)),
                     $"Load function call argument %d{i + 1}"
                 )
-            | false ->
+            | false when i < 8 ->
                 acc.AddText(
                     RV.MV(Reg.a (uint i), Reg.r (env.Target + (uint i) + 1u)),
                     $"Load function call argument %d{i + 1}"
+                )
+            | _ ->
+                // The stack layout of arguments is:
+                // intArgs ...
+                // floatArgs ...
+                
+                let offset =
+                    if isFloat then
+                        (i - 8) * 4 + (intRegsStackCount * 4)
+                    else
+                        (i - 8) * 4
+                
+                // Store register value to stack
+                acc.AddText(
+                    RV.SW(Reg.r (env.Target + (uint i) + 1u), Imm12(offset), Reg.sp),
+                    $"Load function call argument %d{i + 1} on the stack"
                 )
 
         /// Code that loads each application argument into a register 'a', by
@@ -989,12 +1026,33 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
         let argsLoadCode = (List.fold (copyArg false) (Asm()) [ 0 .. (intArgs.Length - 1) ])
                            ++ (List.fold (copyArg true) (Asm()) [ 0 .. (floatArgs.Length - 1) ])
 
+        
+        let argSpSize =
+            if intRegsStackCount + floatRegsStackCount > 0 then
+                (intRegsStackCount + floatRegsStackCount) * 4
+            else
+                0
+       
+        let argSpDecCode = 
+            if argSpSize > 0 then
+                Asm(RV.ADDI(Reg.sp, Reg.sp, Imm12(-argSpSize)), "Decrement stack pointer for arguments")
+            else
+                Asm()
+
+        let argSpIncCode =
+            if argSpSize > 0 then
+                Asm(RV.ADDI(Reg.sp, Reg.sp, Imm12(argSpSize)), "Increment stack pointer for arguments")
+            else
+                Asm()
+
+        
         /// Code that performs the function call
         let callCode =
             appTermCode
             ++ argsCode // Code to compute each argument of the function call
                 .AddText(RV.COMMENT("Before function call: save caller-saved registers"))
             ++ (saveRegisters saveRegs saveFPRegs)
+            ++ argSpDecCode
             ++ argsLoadCode // Code to load arg values into arg registers
                 .AddText(RV.JALR(Reg.ra, Imm12(0), Reg.r (env.Target)), "Function call")
 
@@ -1009,6 +1067,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
         // Put everything together and restore the caller-saved registers
         callCode.AddText(RV.COMMENT("After function call"))
         ++ retCode.AddText(RV.COMMENT("Restore caller-saved registers"))
+        ++ argSpIncCode
         ++ (restoreRegisters saveRegs saveFPRegs)
 
     | StructCons(fields) ->
@@ -1251,22 +1310,43 @@ and internal restoreRegisters (rs: List<Reg>) (fprs: List<FPReg>) : Asm =
 and internal compileFunction (args: List<string * Type>) (body: TypedAST) (env: CodegenEnv) : Asm =
     /// List of indexed arguments: we use the index as the number of the 'a'
     /// register that holds the argument
-    
     let (floatArgs, intArgs) =
         List.partition (fun (_, t) -> isSubtypeOf body.Env Set.empty t TFloat) args
-        
     let indexedArgs = List.indexed intArgs
     let indexedFloatArgs = List.indexed floatArgs
+    let intArgStackCount = if intArgs.Length > 8 then intArgs.Length - 8 else 0
+    let floatArgStackCount = if floatArgs.Length > 8 then floatArgs.Length - 8 else 0
 
+    /// Integer registers to save before executing the function body.
+    /// Note: the definition of 'saveRegs' uses list comprehension:
+    /// https://en.wikibooks.org/wiki/F_Sharp_Programming/Lists#Using_List_Comprehensions
+    let saveRegs =
+        [ for i in 0u .. 11u do
+              yield Reg.s (i) ]
+        
+    let saveFPRegs =
+        [ for i in 0u .. 11u do
+              yield FPReg.fs (i) ]
+        
+    let savedArgsSpSize = (saveRegs.Length + saveFPRegs.Length) * 4
+    
     /// Folder function that assigns storage information to function arguments:
     /// it assigns an 'a' register to each function argument, and accumulates
     /// the result in a mapping (that will be used as env.VarStorage)
     let folder (isFloat) (acc: Map<string, Storage>) (i, (var, _tpe)) =
         match isFloat with
-        | true ->
+        | true when i < 8 ->
             acc.Add(var, Storage.FPReg(FPReg.fa ((uint) i)))
-        | false ->
+        | false when i < 8 ->
             acc.Add(var, Storage.Reg(Reg.a ((uint) i)))
+        | _ ->
+            let offset =
+                if isFloat then
+                    (i - 8) * 4 + (intArgStackCount * 4)
+                else
+                    (i - 8) * 4
+
+            acc.Add(var, Storage.Frame(savedArgsSpSize + offset))
 
     /// Updated storage information including function arguments
     let varStorage2 = List.fold (folder false) env.VarStorage indexedArgs
@@ -1297,16 +1377,7 @@ and internal compileFunction (args: List<string * Type>) (body: TypedAST) (env: 
         | false ->
             Asm(RV.MV(Reg.a0, Reg.r (0u)), "Move result of function into return value register")
 
-    /// Integer registers to save before executing the function body.
-    /// Note: the definition of 'saveRegs' uses list comprehension:
-    /// https://en.wikibooks.org/wiki/F_Sharp_Programming/Lists#Using_List_Comprehensions
-    let saveRegs =
-        [ for i in 0u .. 11u do
-              yield Reg.s (i) ]
-        
-    let saveFPRegs =
-        [ for i in 0u .. 11u do
-              yield FPReg.fs (i) ]
+
 
     // Finally, we put together the full code for the function
     Asm(RV.COMMENT("Funtion prologue begins here"))

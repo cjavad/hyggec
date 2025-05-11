@@ -8,4 +8,14 @@ fun g(b: int, a: float): float = {
   a
 };
 
-assert(g(0, 1.0f + 2.0f) = 3.0f)
+assert(g(0, 1.0f + 2.0f) = 3.0f);
+
+fun h(x1: int, x2: int, x3: int, x4: int, x5: int,
+      y1: float, y2: float, y3: float, y4: float, y5: float): bool = {
+    
+    let x = x1 + x2 + x3 + x4 + x5;
+    let y = y1 + y2 + y3 + y4 + y5;
+    true
+};
+
+assert(h(1, 2, 3, 4, 5, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f))
