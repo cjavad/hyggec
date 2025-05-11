@@ -27,9 +27,11 @@ type Type =
     /// A function type, with argument types and return type.
     | TFun of args: List<Type> * ret: Type
     /// A struct type with ordered fields, each having a unique name and a type.
-    | TStruct of fields: List<string * Type>
+    | TStruct of fields: List<bool * string * Type>
     /// Discriminated union type.  Each case consists of a label and a type.
     | TUnion of cases: List<string * Type>
+    /// An array type with elements
+    | TArray of elements: Type
 
     /// Returns a human-readable string describing the type.
     override this.ToString(): string =
@@ -45,13 +47,17 @@ type Type =
             let argsStr = List.map fmtArg args
             "(" + System.String.Join(", ", argsStr) + $") -> %O{ret}"
         | TStruct(fields) ->
-            let fmtEntry (f: string, t: Type) = $"%s{f}: %O{t}"
+            let fmtEntry (m: bool, f: string, t: Type) =
+                let m = if m then "mutable " else ""
+
+                $"%s{m}%s{f}: %O{t}"
             let entriesStr = Seq.map fmtEntry fields
             "struct {" + System.String.Join("; ", entriesStr) + "}"
         | TUnion(cases) ->
             let fmtCase (f: string, t: Type) = $"%s{f}: %O{t}"
             let casesStr = Seq.map fmtCase cases
             "union {" + System.String.Join("; ", casesStr) + "}"
+        | TArray(elements) -> $"array %O{elements}"
 
 /// List of basic types known by the compiler.  NOTE: this list must be kept in
 /// sync with the definition of 'Type'.
@@ -70,11 +76,12 @@ let rec freeTypeVars (t: Type): Set<string> =
     | TFun(args, ret) ->
         Set.union (collectFreeTypeVars args) (freeTypeVars ret)
     | TStruct(fields) ->
-        let (_, fieldTypes) = List.unzip fields
+        let fieldTypes = fields |> List.map (fun (_, _, t) -> t)
         collectFreeTypeVars fieldTypes
     | TUnion(cases) ->
         let (_, caseTypes) = List.unzip cases
         collectFreeTypeVars caseTypes
+    | TArray(elements) -> freeTypeVars elements
 
 /// Collect all free type variables in the given list of types.
 and collectFreeTypeVars (ts: List<Type>): Set<string> =

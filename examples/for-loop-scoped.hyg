@@ -1,0 +1,17 @@
+// Number of terms of the Fibonacci sequence to print (minimum 2).
+let n = 16;
+
+let mutable t0 = 0;   // First term in the Fibonacci sequence
+let mutable t1 = 1;   // Second term in the Fibonacci sequence
+
+println(t0);
+println(t1);
+
+let mutable next = 0; // Next term in the Fibonacci sequence
+
+for (let mutable i = 2; i < n; i <- i + 1) {
+    next <- t0 + t1;
+    println(next);
+    t0 <- t1;
+    t1 <- next
+}

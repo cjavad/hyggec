@@ -51,12 +51,12 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = Sqrt(subst arg var sub)}
     | And(lhs, rhs) ->
         {node with Expr = And((subst lhs var sub), (subst rhs var sub))}
-    | SCAnd(lhs, rhs) ->
-        {node with Expr = SCAnd((subst lhs var sub), (subst rhs var sub))}
+    | ScAnd(lhs, rhs) ->
+        {node with Expr = And((subst lhs var sub), (subst rhs var sub))}
     | Or(lhs, rhs) ->
         {node with Expr = Or((subst lhs var sub), (subst rhs var sub))}
-    | SCOr(lhs, rhs) ->
-        {node with Expr = SCOr((subst lhs var sub), (subst rhs var sub))}
+    | ScOr(lhs, rhs) ->
+        {node with Expr = Or((subst lhs var sub), (subst rhs var sub))}
     | Xor(lhs, rhs) ->
         {node with Expr = Xor((subst lhs var sub), (subst rhs var sub))}
     | Not(arg) ->
@@ -74,6 +74,17 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
     | GreaterEq(lhs, rhs) ->
         {node with Expr = GreaterEq((subst lhs var sub), (subst rhs var sub))}
 
+    | SubAssign(lhs, rhs) ->
+        {node with Expr = SubAssign((subst lhs var sub), (subst rhs var sub))}
+    | AddAssign(lhs, rhs) ->
+        {node with Expr = AddAssign((subst lhs var sub), (subst rhs var sub))}
+    | DivAssign(lhs, rhs) ->
+        {node with Expr = DivAssign((subst lhs var sub), (subst rhs var sub))}
+    | MultAssign(lhs, rhs) ->
+        {node with Expr = MultAssign((subst lhs var sub), (subst rhs var sub))}
+    | RemAssign(lhs, rhs) ->
+        {node with Expr = RemAssign((subst lhs var sub), (subst rhs var sub))}
+
     | ReadInt
     | ReadFloat -> node // The substitution has no effect
 
@@ -81,6 +92,8 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = Print(subst arg var sub)}
     | PrintLn(arg) ->
         {node with Expr = PrintLn(subst arg var sub)}
+    | Syscall(num, args) ->
+        {node with Expr = Syscall(num, List.map (fun n -> (subst n var sub)) args)}
     
     | Preinc(arg) ->
         {node with Expr = Preinc(subst arg var sub)}
@@ -139,6 +152,13 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         let substBody = subst body var sub
         {node with Expr = While(substCond, substBody)}
 
+    | For(ident, init, cond, step, body) ->
+        let substInit = subst init var sub
+        let substCond = subst cond var sub
+        let substStep = subst step var sub
+        let substBody = subst body var sub
+        {node with Expr = For(ident, substInit, substCond, substStep, substBody)}
+
     | Lambda(args, body) ->
         /// Arguments of this lambda term, without their pretypes
         let (argVars, _) = List.unzip args
@@ -151,9 +171,9 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
         {node with Expr = Application(substExpr, substArgs)}
 
     | StructCons(fields) ->
-        let (fieldNames, initNodes) = List.unzip fields
+        let (fieldMutables, fieldNames, initNodes) = List.unzip3 fields
         let substInitNodes = List.map (fun e -> (subst e var sub)) initNodes
-        {node with Expr = StructCons(List.zip fieldNames substInitNodes)}
+        {node with Expr = StructCons(List.zip3 fieldMutables fieldNames substInitNodes)}
 
     | FieldSelect(target, field) ->
         {node with Expr = FieldSelect((subst target var sub), field)}
@@ -168,6 +188,12 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
             else (lab, v, (subst cont var sub))
         let cases2 = List.map substCase cases
         {node with Expr = Match((subst expr var sub), cases2)}
+    | Array(length, data) ->
+        {node with Expr = Array((subst length var sub), (subst data var sub))}
+    | ArrayLength(arr) ->
+        {node with Expr = ArrayLength(subst arr var sub)}
+    | ArrayElem(arr, index) ->
+        {node with Expr = ArrayElem((subst arr var sub), (subst index var sub))}
 
 /// Compute the set of free variables in the given AST node.
 let rec freeVars (node: Node<'E,'T>): Set<string> =
@@ -190,12 +216,22 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
     | BSL(lhs, rhs)
     | BSR(lhs, rhs)
     | Rem(lhs, rhs) 
+    | BAnd(lhs, rhs)
+    | BOr(lhs, rhs)
+    | BXor(lhs, rhs)
+    | BSL(lhs, rhs)
+    | BSR(lhs, rhs)
     | Sub(lhs, rhs)
     | And(lhs, rhs)
-    | SCAnd(lhs, rhs)
+    | ScAnd(lhs, rhs)
     | Xor(lhs, rhs)
-    | SCOr(lhs, rhs)
-    | Or(lhs, rhs) ->
+    | ScOr(lhs, rhs)
+    | Or(lhs, rhs) 
+    | AddAssign(lhs, rhs)
+    | SubAssign(lhs, rhs)
+    | DivAssign(lhs, rhs)
+    | MultAssign(lhs, rhs) 
+    | RemAssign(lhs, rhs) ->
         Set.union (freeVars lhs) (freeVars rhs)
     | BNot(arg)
     | Sqrt(arg) -> freeVars arg
@@ -231,7 +267,9 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
         // Union of the free names of the lhs and the rhs of the assignment
         Set.union (freeVars target) (freeVars expr)
     | While(cond, body) -> Set.union (freeVars cond) (freeVars body)
+    | For(ident, init, cond, step, body) -> Set.union (freeVars cond) (freeVars body)
     | Assertion(arg) -> freeVars arg
+    | Syscall(_, args) -> freeVarsInList args
     | Copy(arg) -> freeVars arg
     | Type(_, _, scope) -> freeVars scope
     | Lambda(args, body) ->
@@ -244,7 +282,7 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
         // Union of free variables in the applied expr, plus all its arguments
         Set.union (freeVars expr) (freeVarsInList args)
     | StructCons(fields) ->
-        let (_, nodes) = List.unzip fields
+        let (_, _, nodes) = List.unzip3 fields
         freeVarsInList nodes
     | FieldSelect(expr, _) -> freeVars expr
     | UnionCons(_, expr) -> freeVars expr
@@ -257,6 +295,12 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
         /// Free variables in all match continuations
         let fvConts = List.fold folder Set[] cases
         Set.union (freeVars expr) fvConts
+    | Array(length, data) ->
+        Set.union (freeVars length) (freeVars data)
+    | ArrayLength(arr) ->
+        freeVars arr
+    | ArrayElem(arr, index) ->
+        Set.union (freeVars arr) (freeVars index)
 
 /// Compute the union of the free variables in a list of AST nodes.
 and internal freeVarsInList (nodes: List<Node<'E,'T>>): Set<string> =
@@ -286,15 +330,20 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
     | BSR(lhs, rhs)
     | Sub(lhs, rhs)
     | Add(lhs, rhs)
-    | Mult(lhs, rhs) ->
+    | Mult(lhs, rhs)
+    | AddAssign(lhs, rhs)
+    | SubAssign(lhs, rhs) 
+    | MultAssign(lhs, rhs)
+    | DivAssign(lhs, rhs)
+    | RemAssign(lhs, rhs) ->
         Set.union (capturedVars lhs) (capturedVars rhs)
     | Div(lhs, rhs) ->
         Set.union (capturedVars lhs) (capturedVars rhs)
     | Rem(lhs, rhs) 
     | And(lhs, rhs)
-    | SCAnd(lhs, rhs)
+    | ScAnd(lhs, rhs)
     | Xor(lhs, rhs)
-    | SCOr(lhs, rhs)
+    | ScOr(lhs, rhs)
     | Or(lhs, rhs) ->
         Set.union (capturedVars lhs) (capturedVars rhs)
     | BNot(arg)
@@ -331,7 +380,9 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         // Union of the captured vars of the lhs and the rhs of the assignment
         Set.union (capturedVars target) (capturedVars expr)
     | While(cond, body) -> Set.union (capturedVars cond) (capturedVars body)
+    | For(ident, init, cond, step, body) -> Set.union (capturedVars cond) (capturedVars body)
     | Assertion(arg) -> capturedVars arg
+    | Syscall(_, args) -> capturedVarsInList args
     | Copy(arg) -> capturedVars arg
     | Type(_, _, scope) -> capturedVars scope
     | Application(expr, args) ->
@@ -339,7 +390,7 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         // Union of captured variables in the applied expr, plus all arguments
         Set.union (capturedVars expr) (capturedVarsInList args)
     | StructCons(fields) ->
-        let (_, nodes) = List.unzip fields
+        let (_, _, nodes) = List.unzip3 fields
         capturedVarsInList nodes
     | FieldSelect(expr, _) -> capturedVars expr
     | UnionCons(_, expr) -> capturedVars expr
@@ -352,6 +403,12 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         /// Captured variables in all match continuations
         let cvConts = List.fold folder Set[] cases
         Set.union (capturedVars expr) cvConts
+    | Array(length, data) ->
+        Set.union (capturedVars length) (capturedVars data)
+    | ArrayLength(arr) ->
+        capturedVars arr
+    | ArrayElem(arr, index) ->
+        Set.union (capturedVars arr) (capturedVars index)
 
 /// Compute the union of the captured variables in a list of AST nodes.
 and internal capturedVarsInList (nodes: List<Node<'E,'T>>): Set<string> =

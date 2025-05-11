@@ -1,0 +1,3 @@
+let mutable x = "hello";
+
+x += 2 // error: cannot use operator '+=' with operands of type 'string' and 'int'

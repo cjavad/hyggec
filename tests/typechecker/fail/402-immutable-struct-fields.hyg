@@ -1,0 +1,2 @@
+let x = struct { immutable a = 0 };
+x.a <- 1 // fails due to assign to immutable field

@@ -1,0 +1,2 @@
+assert(true && true);
+assert(false || true)

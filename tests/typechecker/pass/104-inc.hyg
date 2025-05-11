@@ -1,0 +1,6 @@
+let mutable x = 4;
+let mutable y = 4.0f;
+(x++): int;
+(++x): int;
+(++y): float;
+(y++): float

@@ -58,10 +58,20 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         {node with Expr = Div((substVar lhs var var2), (substVar rhs var var2))}
     | Rem(lhs, rhs) ->
         {node with Expr = Rem((substVar lhs var var2), (substVar rhs var var2))}
+    | AddAssign(lhs, rhs) ->
+        {node with Expr = AddAssign((substVar lhs var var2), (substVar rhs var var2))}
+    | SubAssign(lhs, rhs) ->
+        {node with Expr = SubAssign((substVar lhs var var2), (substVar rhs var var2))}
+    | MultAssign(lhs, rhs) ->
+        {node with Expr = MultAssign((substVar lhs var var2), (substVar rhs var var2))}
+    | DivAssign(lhs, rhs) ->
+        {node with Expr = DivAssign((substVar lhs var var2), (substVar rhs var var2))}
+    | RemAssign(lhs, rhs) ->
+        {node with Expr = RemAssign((substVar lhs var var2), (substVar rhs var var2))}
     | And(lhs, rhs) ->
         {node with Expr = And((substVar lhs var var2), (substVar rhs var var2))}
-    | SCAnd(lhs, rhs) ->
-        {node with Expr = SCAnd((substVar lhs var var2), (substVar rhs var var2))}
+    | ScAnd(lhs, rhs) ->
+        {node with Expr = ScAnd((substVar lhs var var2), (substVar rhs var var2))}
     | Or(lhs, rhs) ->
         {node with Expr = Or((substVar lhs var var2), (substVar rhs var var2))}
     | BNot(arg) ->
@@ -76,8 +86,8 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         {node with Expr = BSL((substVar lhs var var2), (substVar rhs var var2))}
     | BSR(lhs, rhs) ->
         {node with Expr = BSR((substVar lhs var var2), (substVar rhs var var2))}
-    | SCOr(lhs, rhs) ->
-        {node with Expr = Or((substVar lhs var var2), (substVar rhs var var2))}
+    | ScOr(lhs, rhs) ->
+        {node with Expr = ScOr((substVar lhs var var2), (substVar rhs var var2))}
     | Xor(lhs, rhs) ->
         {node with Expr = Xor((substVar lhs var var2), (substVar rhs var var2))}
     | Sqrt(arg) ->
@@ -106,11 +116,13 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         {node with Expr = Print(substVar arg var var2)}
     | PrintLn(arg) ->
         {node with Expr = PrintLn(substVar arg var var2)}
-
+    | Syscall(num, args) ->
+        let substArgs = List.map (fun n -> (substVar n var var2)) args
+        {node with Expr = Syscall(num, substArgs)}
     | If(cond, ifTrue, ifFalse) ->
         {node with Expr = If((substVar cond var var2), (substVar ifTrue var var2),
                                                        (substVar ifFalse var var2))}
-
+   
     | Seq(nodes) ->
         let substNodes = List.map (fun n -> (substVar n var var2)) nodes
         {node with Expr = Seq(substNodes)}
@@ -147,6 +159,13 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         let substBody = substVar body var var2
         {node with Expr = While(substCond, substBody)}
 
+    | For(ident, init, cond, step, body) ->
+        let substCond = substVar cond var var2
+        let substBody = substVar body var var2
+        let substInit = substVar init var var2
+        let substStep = substVar init var var2
+        {node with Expr = For(ident, substInit, substCond, substStep, substBody)}
+
     | Assertion(arg) ->
         {node with Expr = Assertion(substVar arg var var2)}
 
@@ -168,9 +187,9 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         {node with Expr = Application(substExpr, substArgs)}
 
     | StructCons(fields) ->
-        let (fieldNames, initNodes) = List.unzip fields
+        let (fieldMutables, fieldNames, initNodes) = List.unzip3 fields
         let substInitNodes = List.map (fun e -> (substVar e var var2)) initNodes
-        {node with Expr = StructCons(List.zip fieldNames substInitNodes)}
+        {node with Expr = StructCons(List.zip3 fieldMutables fieldNames substInitNodes)}
 
     | FieldSelect(target, field) ->
         {node with Expr = FieldSelect((substVar target var var2), field)}
@@ -185,6 +204,11 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
             else (lab, v, (substVar cont var var2))
         let cases2 = List.map substCase cases
         {node with Expr = Match((substVar expr var var2), cases2)}
+    
+    | ArrayElem(target, index) -> failwith "Not done"
+    | ArrayLength(target) -> failwith "Not done"
+    | Array(length, data) -> failwith "Not done"
+    
 
 
 /// Convert a given AST node (expected to contain a variable) and a list of ANF
@@ -233,9 +257,9 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
     | Div(lhs, rhs)
     | Rem(lhs, rhs)
     | And(lhs, rhs)
-    | SCAnd(lhs, rhs)
+    | ScAnd(lhs, rhs)
     | Or(lhs, rhs)
-    | SCOr(lhs, rhs)
+    | ScOr(lhs, rhs)
     | Xor(lhs, rhs)
     | Eq(lhs, rhs)
     | Greater(lhs, rhs)
@@ -257,7 +281,10 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
                       | Add(_,_) -> Add(lhsANF, rhsANF)
                       | Mult(_,_) -> Mult(lhsANF, rhsANF)
                       | And(_,_) -> And(lhsANF, rhsANF)
+                      | ScAnd(_,_) -> ScAnd(lhsANF, rhsANF)
                       | Or(_,_) -> Or(lhsANF, rhsANF)
+                      | ScOr(_,_) -> ScOr(lhsANF, rhsANF)
+                      | Xor(_,_) -> Xor(lhsANF, rhsANF)
                       | Eq(_,_) -> Eq(lhsANF, rhsANF)
                       | Greater(_,_) -> Greater(lhsANF, rhsANF)
                       | LessEq(_,_) -> LessEq(lhsANF, rhsANF)
@@ -300,7 +327,14 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
         let anfDef = ANFDef(false, {node with Expr = anfExpr})
 
         ({node with Expr = Var(anfDef.Var)}, anfDef :: argDefs)
+    | Syscall(num, args) ->
+        /// Arguments in ANF and related definitions
+        let (argsANF, argsDefs) = List.unzip (List.map toANFDefs args)
+        /// Definition binding this expression in ANF to its variable
+        let anfDef = ANFDef(false, {node with Expr = Syscall(num, argsANF)})
 
+        ({node with Expr = Var(anfDef.Var)},
+         anfDef :: List.concat (List.rev argsDefs))
     | Seq(nodes) ->
         match (List.rev nodes) with
         | [] ->
@@ -325,6 +359,9 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
     
     | Postinc(arg) -> failwith"Implement increment"
     | Preinc(arg) -> failwith"Implement increment"
+    | Array(length, data) -> failwith"Implement array"
+    | ArrayElem(target, index) -> failwith"Implement array"
+    | ArrayLength(target) -> failwith"Implement array"
     
     | If(condition, ifTrue, ifFalse) ->
         /// Condition in ANF and related definitions
@@ -372,22 +409,36 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
 
         ({node with Expr = scopeANF.Expr}, scopeDefs @ letDef :: initDefs)
 
-    | Assign(target, asgnExpr) ->
+    | Assign(target, asgnExpr)
+    | AddAssign(target, asgnExpr)
+    | SubAssign(target, asgnExpr)
+    | MultAssign(target, asgnExpr)
+    | DivAssign(target, asgnExpr)
+    | RemAssign(target, asgnExpr) ->
+        let asgnExpr = 
+            match node.Expr with
+            | AddAssign(_, _) -> {asgnExpr with Expr = Add(target, asgnExpr)}
+            | SubAssign(_, _) -> {asgnExpr with Expr = Sub(target, asgnExpr)}
+            | MultAssign(_, _) -> {asgnExpr with Expr = Mult(target, asgnExpr)}
+            | DivAssign(_, _) -> {asgnExpr with Expr = Div(target, asgnExpr)}
+            | RemAssign(_, _) -> {asgnExpr with Expr = Rem(target, asgnExpr)}
+            | _ -> asgnExpr
+
         /// Source expression of the assignment in ANF and related definitions
-        let (asgnExprANF, asgnExprDefs) = toANFDefs asgnExpr
+        let asgnExprANF, asgnExprDefs = toANFDefs asgnExpr
         match target.Expr with
-        | Var(_) ->
+        | Var _ ->
             /// Definition binding this expression in ANF to its variable
             let anfDef = ANFDef(false, {node with Expr = Assign(target, asgnExprANF)})
-            ({node with Expr = Var(anfDef.Var)}, anfDef :: asgnExprDefs)
+            {node with Expr = Var anfDef.Var}, anfDef :: asgnExprDefs
         | FieldSelect(ftarget, field) ->
             /// Target expr of the field selection in ANF and related definitions
-            let (ftargetExprANF, ftargetExprDefs) = toANFDefs ftarget
+            let ftargetExprANF, ftargetExprDefs = toANFDefs ftarget
             /// Assignment to field selection in ANF form
             let anfAssign = Assign({target with Expr = FieldSelect(ftargetExprANF, field)}, asgnExprANF)
             /// Definition binding this expression in ANF to its variable
             let anfDef = ANFDef(false, {node with Expr = anfAssign})
-            ({node with Expr = Var(anfDef.Var)}, anfDef :: (ftargetExprDefs @ asgnExprDefs))
+            {node with Expr = Var anfDef.Var}, anfDef :: (ftargetExprDefs @ asgnExprDefs)
         | _ ->
             failwith $"BUG: invalid assignment target: %O{target}"
 
@@ -398,6 +449,20 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
         let bodyANF = toANF (toANFDefs body)
         /// Definition binding this expression in ANF to its variable
         let anfDef = ANFDef(false, {node with Expr = While(condANF, bodyANF)})
+
+        ({node with Expr = Var(anfDef.Var)}, [anfDef])
+
+    | For(ident, init, cond, step, body) ->
+        /// Condition expression in ANF and related definitions
+        let condANF = toANF (toANFDefs cond)
+        /// Body of the 'while' loop in ANF
+        let bodyANF = toANF (toANFDefs body)
+
+        let initANF = toANF (toANFDefs init)
+
+        let stepANF = toANF (toANFDefs step)
+        /// Definition binding this expression in ANF to its variable
+        let anfDef = ANFDef(false, {node with Expr = For(ident, initANF, condANF, stepANF, bodyANF)})
 
         ({node with Expr = Var(anfDef.Var)}, [anfDef])
     
@@ -424,7 +489,7 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
         let uniqArgs = List.zip uniqArgNames argTypes
 
         ({node with Expr = Lambda(uniqArgs, bodyANF)}, [])
-
+    
     | Application(appExpr, args) ->
         /// Applied expression in ANF and related definitions
         let (appExprANF, appExprDefs) = toANFDefs appExpr
@@ -438,11 +503,11 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
          anfDef :: List.concat (List.rev argsDefs) @ appExprDefs)
 
     | StructCons(fields) ->
-        let (fieldNames, fieldNodes) = List.unzip fields
+        let (fieldMutables, fieldNames, fieldNodes) = List.unzip3 fields
         /// Struct fields in ANF and related definitions
         let (fieldsANF, fieldsDefs) = List.unzip (List.map toANFDefs fieldNodes)
         /// Updated structure fields (names and nodes) in ANF
-        let fields2 = List.zip fieldNames fieldsANF
+        let fields2 = List.zip3 fieldMutables fieldNames fieldsANF
         /// Definition binding this expression in ANF to its variable
         let anfDef = ANFDef(false, {node with Expr = StructCons(fields2)})
 

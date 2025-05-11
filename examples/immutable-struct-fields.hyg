@@ -1,0 +1,2 @@
+let x: struct { immutable a: int } = struct { a = 1 };
+println(x.a)
