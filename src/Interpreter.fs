@@ -926,7 +926,6 @@ and internal heapAlloc (heap: Heap<'E, 'T>) (values: List<Node<'E, 'T>>) : Heap<
     (heap2, baseAddr)
 
 and internal deepCopy (renv': RuntimeEnv<'E, 'T>) (node': Node<'E, 'T>): Option<RuntimeEnv<'E, 'T> * Node<'E, 'T>> =
-    // yes there is error, i don't care it works
     let rec dCopy (renv: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>): Option<RuntimeEnv<'E, 'T> * Node<'E, 'T>> =  
         match node.Expr with
         | UnitVal
