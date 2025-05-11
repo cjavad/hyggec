@@ -817,14 +817,10 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
                     | TInt ->
                         Asm(RV.SW(Reg.r(env.Target + 2u), Imm12(0), Reg.r(env.Target)),
                             "Store the array element")
-                    | _ -> failwithf$"Not right now"
+                    | _ -> failwithf$"Bugged"
                 targetCode ++ indexCode ++ rhsCode ++ addrCode ++ storingCode
-            | _ -> failwithf"Bugged"
-        | _ ->
-            failwith (
-                $"BUG: assignment to invalid target:%s{Util.nl}"
-                + $"%s{PrettyPrinter.prettyPrint lhs}"
-            )
+            | _ -> failwith $"Bugged"
+        | _ -> failwith $"Bugged"
 
     | While(cond, body) ->
         /// Label to mark the beginning of the 'while' loop
