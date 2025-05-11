@@ -817,7 +817,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
                     | TInt ->
                         Asm(RV.SW(Reg.r(env.Target + 2u), Imm12(0), Reg.r(env.Target)),
                             "Store the array element")
-                    | _ -> failwithf$"Bugged"
+                    | _ -> failwith$"Bugged"
                 targetCode ++ indexCode ++ rhsCode ++ addrCode ++ storingCode
             | _ -> failwith $"Bugged"
         | _ -> failwith $"Bugged"
@@ -1100,12 +1100,12 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
                         match init.Type with
                         | t when isSubtypeOf init.Env Set.empty t TInt ->
                             acc.AddText(RV.SW(Reg.r(env.Target + 1u), Imm12((i + 1) * 4), Reg.r(env.Target)))
-                        | _ -> failwithf$"Not supported right now"
+                        | _ -> failwith$"Not supported right now"
                     List.fold folder (Asm()) [0 .. n-1]
                     
                 sizeCode ++ allocationCode ++ initCode ++ storingCode
-            | _ -> failwithf$"Not supported right now"
-        | t -> failwithf$"Bugged"
+            | _ -> failwith$"Not supported right now"
+        | t -> failwith$"Bugged"
     | ArrayElem(target, index) ->
         let targetCode = doCodegen env target
         let indexCode = doCodegen { env with Target = env.Target + 1u } index
@@ -1127,16 +1127,16 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
                     Asm(RV.LW(Reg.r(env.Target), Imm12(0), Reg.r(env.Target)),
                         "Load array element")
                 | _ ->
-                    failwithf$"Bugged"
+                    failwith$"Bugged"
             targetCode ++ indexCode ++ addrCode ++ loadCode
-        | t -> failwithf"Bugged"
+        | t -> failwith"Bugged"
     | ArrayLength(target) ->
         let targetCode = doCodegen env target
         match target.Type with
         | TArray(_) ->
             targetCode.AddText(RV.LW(Reg.r(env.Target), Imm12(0), Reg.r(env.Target)),
                                "Array length from base addr")
-        | t -> failwithf$"Bugged"
+        | t -> failwith$"Bugged"
 
 /// Generate code to save the given registers on the stack, before a RARS system
 /// call. Register a7 (which holds the system call number) is backed-up by
