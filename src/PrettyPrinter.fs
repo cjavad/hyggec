@@ -197,6 +197,10 @@ let rec internal formatASTRec (node: AST.Node<'E,'T>): Tree =
                                    ("node", formatASTRec node)]
     | Assertion(arg) ->
         mkTree "Assertion" node [("arg", formatASTRec arg)]
+    
+    | Copy(arg) ->
+        mkTree "Copy" node [("arg", formatASTRec arg)]
+    
     | Let(name, init, scope) ->
         mkTree $"Let %s{name}" node [("init", formatASTRec init)
                                      ("scope", formatASTRec scope)]

@@ -38,8 +38,7 @@ let prettyPrintValue (node: Node<'E, 'T>) : string =
     | Lambda(args, _) -> $"Lambda (taking %d{args.Length} arguments)"
     | Pointer(addr) -> $"Pointer 0x%x{addr}"
     | _ -> failwith $"BUG: 'prettyPrintValue' called with invalid argument ${node}"
-
-
+    
 /// Type for the runtime heap: a map from memory addresses to values.  The type
 /// parameters have the same meaning of the corresponding ones in
 /// AST.Node<'E,'T>: they allow the heap to hold generic instances of
@@ -94,7 +93,6 @@ type internal RuntimeEnv<'E, 'T> =
         + $"%s{Util.nl}  - Mutables: %s{Util.formatMap this.Mutables}"
         + $"%s{Util.nl}  - Heap: %s{heapStr}"
         + $"%s{Util.nl}  - PtrInfo: %s{ptrInfoStr}"
-
 
 /// Attempt to reduce the given AST node by one step, using the given runtime
 /// environment.  If a reduction is possible, return the reduced node and an
@@ -670,6 +668,9 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
             else
                 None
 
+    | Copy(arg) ->
+        deepCopy env arg
+
     | FieldSelect({ Expr = Pointer(addr) }, field) ->
         match (env.PtrInfo.TryFind addr) with
         | Some(fields) ->
@@ -786,6 +787,51 @@ and internal heapAlloc (heap: Heap<'E, 'T>) (values: List<Node<'E, 'T>>) : Heap<
     let folder (h: Heap<'E, 'T>) (offset, n) : Heap<'E, 'T> = h.Add(baseAddr + uint (offset), n)
     let heap2 = List.fold folder heap (List.indexed values)
     (heap2, baseAddr)
+
+and internal deepCopy (renv': RuntimeEnv<'E, 'T>) (node': Node<'E, 'T>): Option<RuntimeEnv<'E, 'T> * Node<'E, 'T>> =
+    // yes there is error, i don't care it works
+    let rec dCopy (renv: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>): Option<RuntimeEnv<'E, 'T> * Node<'E, 'T>> =  
+        match node.Expr with
+        | UnitVal
+        | BoolVal(_)
+        | IntVal(_)
+        | FloatVal(_)
+        | StringVal(_) -> Some(renv, node)
+        | StructCons(fields) -> 
+            let (fieldNames, fieldNodes) = List.unzip fields
+            let folder (node: Node<'E, 'T>) ((env, nodes): RuntimeEnv<'E, 'T> * List<Node<'E, 'T>>) : RuntimeEnv<'E, 'T> * List<Node<'E, 'T>> =
+                match dCopy env node with
+                | Some(nenv, n) -> (nenv, n :: nodes)
+                | None -> failwith "Error copying node"
+
+            let (env', fieldNodes') = List.foldBack folder fieldNodes (renv, [])
+            let fields' = List.zip fieldNames fieldNodes'
+            Some(env', { node with Expr = StructCons(fields') }) 
+        | Pointer(baseAddr) -> 
+            match (renv.PtrInfo.TryFind baseAddr) with
+            | Some(fieldNames) ->
+                let folder ((offset, field): int * String) ((env, nodes): RuntimeEnv<'E, 'T> * List<Node<'E, 'T>>) : RuntimeEnv<'E, 'T> * List<Node<'E, 'T>> = 
+                    let node = env.Heap[baseAddr + (uint offset)]
+                    match dCopy env node with
+                    | Some(nenv, n) -> (nenv, n :: nodes)
+                    | None -> failwith "Error copying node" 
+
+                let (env, fieldNodes) = List.foldBack folder (List.indexed fieldNames) (renv, [])
+
+                let (heap, baseAddr') = heapAlloc env.Heap fieldNodes
+                let ptrInfo' = env.PtrInfo.Add(baseAddr', fieldNames)
+
+                Some(
+                    { env with
+                        Heap = heap
+                        PtrInfo = ptrInfo' },
+                    { node with Expr = Pointer(baseAddr') }
+                )
+            | None -> None
+            
+        | _ -> failwith "not implemented"
+
+    dCopy renv' node'
 
 /// Reduce the given AST until it cannot reduce further, using the given
 /// (optional) 'reader' and 'writer' functions.  Return the final unreducible

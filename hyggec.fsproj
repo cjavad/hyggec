@@ -36,8 +36,8 @@
     <Compile Include="src/ANF.fs" />
     <Compile Include="src/Type.fs" />
     <Compile Include="src/Typechecker.fs" />
-    <Compile Include="src/PrettyPrinter.fs" />
-    <Compile Include="src/Interpreter.fs" />
+    <Compile Include="src/PrettyPrinter.fs" /><Compile Include="src/Interpreter.fs" />
+    
     <Compile Include="src/RISCV.fs" />
     <Compile Include="src/RISCVCodegen.fs" />
     <Compile Include="src/ANFRISCVCodegen.fs" />

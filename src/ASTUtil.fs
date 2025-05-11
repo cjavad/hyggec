@@ -105,6 +105,9 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
     | Assertion(arg) ->
         {node with Expr = Assertion(subst arg var sub)}
 
+    | Copy(arg) ->
+        {node with Expr = Copy(subst arg var sub)}
+
     | Let(vname, init, scope) when vname = var ->
         // The variable is shadowed, do not substitute it in the "let" scope
         {node with Expr = Let(vname, (subst init var sub), scope)}
@@ -229,6 +232,7 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
         Set.union (freeVars target) (freeVars expr)
     | While(cond, body) -> Set.union (freeVars cond) (freeVars body)
     | Assertion(arg) -> freeVars arg
+    | Copy(arg) -> freeVars arg
     | Type(_, _, scope) -> freeVars scope
     | Lambda(args, body) ->
         let (argNames, _) = List.unzip args
@@ -328,6 +332,7 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
         Set.union (capturedVars target) (capturedVars expr)
     | While(cond, body) -> Set.union (capturedVars cond) (capturedVars body)
     | Assertion(arg) -> capturedVars arg
+    | Copy(arg) -> capturedVars arg
     | Type(_, _, scope) -> capturedVars scope
     | Application(expr, args) ->
         let fvArgs = List.map capturedVars args

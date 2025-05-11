@@ -86,6 +86,7 @@ let mkNode (parseState: IParseState, inputIdx: int, e: UntypedExpr): UntypedAST 
 %token FUN
 %token STRUCT
 %token UNION MATCH WITH
+%token COPY
 
 // Generic identifier (might result in a variable, pretype, etc.)
 %token <string> IDENT
@@ -237,6 +238,7 @@ unaryExpr:
   | PRINT LPAR simpleExpr RPAR    { mkNode(parseState, 1, Expr.Print($3)) }
   | PRINTLN LPAR simpleExpr RPAR  { mkNode(parseState, 1, Expr.PrintLn($3)) }
   | ASSERT LPAR simpleExpr RPAR   { mkNode(parseState, 1, Expr.Assertion($3)) }
+  | COPY LPAR simpleExpr RPAR     { mkNode(parseState, 1, Expr.Copy($3)) }
   | ascriptionExpr                { $1 }
   | primary parenExprCommaSeq     { mkNode(parseState, 1, Expr.Application($1, $2))}
 

@@ -867,6 +867,9 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST): Asm =
         // Put everything together: allocate heap space, init all struct fields
         structAllocCode ++ fieldsInitCode
 
+    | Copy(arg) ->
+        deepCopy env arg
+
     | FieldSelect(target, field) ->
         // To compile a field selection, we first execute the 'target' object of
         // the field selection, whose code is expected to leave a struct memory
@@ -1015,6 +1018,26 @@ and internal compileFunction (args: List<string * Type>)
             .AddText(RV.COMMENT("Restore callee-saved registers"))
             ++ (restoreRegisters saveRegs [])
                 .AddText(RV.JR(Reg.ra), "End of function, return to caller")
+
+and internal deepCopy (env: CodegenEnv) (arg: Node<TypingEnv, Type>): Asm = 
+        let argCode = doCodegen env arg
+
+        match (expandType arg.Env arg.Type) with
+        | TStruct(fields) ->
+            let (fieldNames, fieldTypes) = List.unzip fields
+
+            let folder ((offset, field): int * string) (nodes: List<string * Node<TypingEnv, Type>>): List<string * Node<TypingEnv, Type>> = 
+                let node' = { arg with Expr = match fieldTypes.[offset] with
+                                                | TStruct(_)
+                                                | TVar(_) -> Copy(arg = {{arg with Expr = FieldSelect(target = arg, field = field)} with Type = fieldTypes.[offset]})
+                                                | _ -> FieldSelect(target = arg, field = field)}
+                (field, {node' with Type = fieldTypes.[offset]}) :: nodes
+
+            let fieldNodes: List<string * Node<TypingEnv, Type>> = List.foldBack folder (List.indexed fieldNames) []
+
+            doCodegen env {arg with Expr = StructCons(fields = fieldNodes)}
+
+        | t -> failwith $"Copy on invalid target type: %O{t}"
 
 
 /// Generate RISC-V assembly for the given AST.

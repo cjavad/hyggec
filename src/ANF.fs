@@ -150,6 +150,9 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
     | Assertion(arg) ->
         {node with Expr = Assertion(substVar arg var var2)}
 
+    | Copy(arg) ->
+        {node with Expr = Copy(substVar arg var var2)}
+
     | Type(tname, def, scope) ->
         {node with Expr = Type(tname, def, (substVar scope var var2))}
 
@@ -278,6 +281,7 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
     | Neg(arg)
     | Print(arg)
     | PrintLn(arg)
+    | Copy(arg)
     | Assertion(arg) as expr ->
         /// Argument in ANF and related definitions
         let (argANF, argDefs) = toANFDefs arg
@@ -289,6 +293,7 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
                       | Neg(_) -> Neg(argANF)
                       | Print(_) -> Print(argANF)
                       | PrintLn(_) -> PrintLn(argANF)
+                      | Copy(_) -> Copy(argANF)
                       | Assertion(_)  -> Assertion(argANF)
                       | e -> failwith $"BUG: unexpected expression: %O{e}"
         /// Definition binding this expression in ANF to its variable

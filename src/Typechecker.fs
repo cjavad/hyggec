@@ -157,6 +157,11 @@ let rec expandType (env: TypingEnv) (t: Type): Type =
     | other -> other
 
 
+let rec isStruct (t: Type): bool =
+    match t with
+    | TStruct(_) -> true
+    | _ -> false
+
 /// Check whether 't1' is subtype of 't2' in the typing environment 'env'.
 let rec isSubtypeOf (env: TypingEnv) (t1: Type) (t2: Type): bool =
     match (t1, t2) with
@@ -507,6 +512,15 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST): TypingResult =
             Ok { Pos = node.Pos; Env = env; Type = TUnit; Expr = Assertion(targ) }
         | Ok(targ) ->
             Error([(node.Pos, $"assertion: expected argument of type %O{TBool}, "
+                              + $"found %O{targ.Type}")])
+        | Error(es) -> Error(es)
+
+    | Copy(arg) ->
+        match (typer env arg) with
+        | Ok(targ) when (isStruct targ.Type) ->
+            Ok { Pos = node.Pos; Env = env; Type = targ.Type; Expr = Copy(targ) }
+        | Ok(targ) ->
+            Error([(node.Pos, $"copy: expected argument of type %O{TStruct}, "
                               + $"found %O{targ.Type}")])
         | Error(es) -> Error(es)
 
