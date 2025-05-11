@@ -270,6 +270,7 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
                   Type = tpe
                   Expr = Var(name) }
         | None -> Error([ (node.Pos, $"undefined variable: %s{name}") ])
+
     | Sub(lhs, rhs) ->
         match (binaryNumericalOpTyper "subtraction" node.Pos env lhs rhs) with
         | Ok(tpe, tlhs, trhs) ->
@@ -279,6 +280,7 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
                   Type = tpe
                   Expr = Sub(tlhs, trhs) }
         | Error(es) -> Error(es)
+
     | Add(lhs, rhs) ->
         match (binaryNumericalOpTyper "addition" node.Pos env lhs rhs) with
         | Ok(tpe, tlhs, trhs) ->
@@ -672,6 +674,23 @@ let rec internal typer (env: TypingEnv) (node: UntypedAST) : TypingResult =
         | (Error(es), Ok(_)) -> Error(es)
         | (Ok(_), Error(es)) -> Error(es)
         | (Error(es1), Error(es2)) -> Error(es1 @ es2)
+
+    | AddAssign(target, expr)
+    | SubAssign(target, expr)
+    | MultAssign(target, expr)
+    | DivAssign(target, expr)
+    | RemAssign(target, expr) ->
+        let expr =
+            match node.Expr with
+            | AddAssign(_, _) -> { expr with Expr = Add(target, expr) }
+            | SubAssign(_, _) -> { expr with Expr = Sub(target, expr) }
+            | MultAssign(_, _) -> { expr with Expr = Mult(target, expr) }
+            | DivAssign(_, _) -> { expr with Expr = Div(target, expr) }
+            | RemAssign(_, _) -> { expr with Expr = Rem(target, expr) }
+            | _ -> failwith "impossible: invalid expression"
+
+        let node = { node with Expr = Assign(target, expr) }
+        typer env node
 
     | While(cond, body) ->
         match ((typer env cond), (typer env body)) with

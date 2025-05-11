@@ -123,6 +123,23 @@ let rec internal reduce (env: RuntimeEnv<'E, 'T>) (node: Node<'E, 'T>) : Option<
 
     | Pointer(_) -> None
 
+    | AddAssign(lhs, rhs)
+    | SubAssign(lhs, rhs)
+    | MultAssign(lhs, rhs)
+    | DivAssign(lhs, rhs)
+    | RemAssign(lhs, rhs) ->
+        let rhs =
+            match node.Expr with
+            | AddAssign(_, _) -> { rhs with Expr = Add(lhs, rhs) }
+            | SubAssign(_, _) -> { rhs with Expr = Sub(lhs, rhs) }
+            | MultAssign(_, _) -> { rhs with Expr = Mult(lhs, rhs) }
+            | DivAssign(_, _) -> { rhs with Expr = Div(lhs, rhs) }
+            | RemAssign(_, _) -> { rhs with Expr = Rem(lhs, rhs) }
+            | _ -> failwith $"BUG: unexpected AST node ${node}"
+
+        let assign = { node with Expr = Assign(lhs, rhs) }
+        reduce env assign
+
     | Mult(lhs, rhs) ->
         match (lhs.Expr, rhs.Expr) with
         | (IntVal(v1), IntVal(v2)) -> Some(env, { node with Expr = IntVal(v1 * v2) })

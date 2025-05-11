@@ -110,6 +110,21 @@ and Expr<'E, 'T> =
     // Remainder between lhs and rhs
     | Rem of lhs: Node<'E, 'T> * rhs: Node<'E, 'T>
 
+    // Subtract and assign
+    | SubAssign of lhs: Node<'E, 'T> * rhs: Node<'E, 'T>
+
+    // Add and assign
+    | AddAssign of lhs: Node<'E, 'T> * rhs: Node<'E, 'T>
+
+    // Multiply and assign
+    | MultAssign of lhs: Node<'E, 'T> * rhs: Node<'E, 'T>
+
+    // Divide and assign
+    | DivAssign of lhs: Node<'E, 'T> * rhs: Node<'E, 'T>
+
+    // Remainder and assign
+    | RemAssign of lhs: Node<'E, 'T> * rhs: Node<'E, 'T>
+
     // Square root
     | Sqrt of arg: Node<'E, 'T>
 

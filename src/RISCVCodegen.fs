@@ -112,6 +112,23 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
                 failwith $"BUG: variable %s{name} of type %O{t} has unexpected storage %O{st}"
             | None -> failwith $"BUG: variable without storage: %s{name}"
 
+    | AddAssign(lhs, rhs)
+    | SubAssign(lhs, rhs)
+    | MultAssign(lhs, rhs)
+    | DivAssign(lhs, rhs)
+    | RemAssign(lhs, rhs) ->
+        let rhs =
+            match node.Expr with
+            | AddAssign(_, _) -> { node with Expr = Add(lhs, rhs) }
+            | SubAssign(_, _) -> { node with Expr = Sub(lhs, rhs) }
+            | MultAssign(_, _) -> { node with Expr = Mult(lhs, rhs) }
+            | DivAssign(_, _) -> { node with Expr = Div(lhs, rhs) }
+            | RemAssign(_, _) -> { node with Expr = Rem(lhs, rhs) }
+            | x -> failwith $"BUG: unexpected operation %O{x}"
+
+        let node = { node with Expr = Assign(lhs, rhs) }
+        doCodegen env node
+
     | Sub(lhs, rhs)
     | Add(lhs, rhs)
     | Div(lhs, rhs)

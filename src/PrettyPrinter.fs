@@ -125,6 +125,21 @@ let rec internal formatASTRec (node: AST.Node<'E, 'T>) : Tree =
     | Sub(lhs, rhs) ->
         mkTree "Sub" node [("lhs", formatASTRec lhs)
                            ("rhs", formatASTRec rhs)]
+    | AddAssign(lhs, rhs) ->
+        mkTree "AddAssign" node [("lhs", formatASTRec lhs)
+                                 ("rhs", formatASTRec rhs)]
+    | SubAssign(lhs, rhs) ->
+        mkTree "SubAssign" node [("lhs", formatASTRec lhs)
+                                 ("rhs", formatASTRec rhs)]
+    | MultAssign(lhs, rhs) ->
+        mkTree "MultAssign" node [("lhs", formatASTRec lhs)
+                                  ("rhs", formatASTRec rhs)]
+    | DivAssign(lhs, rhs) ->
+        mkTree "DivAssign" node [("lhs", formatASTRec lhs)
+                                 ("rhs", formatASTRec rhs)]
+    | RemAssign(lhs, rhs) ->
+        mkTree "RemAssign" node [("lhs", formatASTRec lhs)
+                                 ("rhs", formatASTRec rhs)]
     | BNot(arg) ->
         mkTree "BNot" node [("arg", formatASTRec arg)]
     | BAnd(lhs, rhs) ->

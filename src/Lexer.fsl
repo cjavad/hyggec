@@ -52,6 +52,13 @@ rule tokenize = parse
 | ","          { Parser.COMMA }
 | "."          { Parser.DOT }
 
+// Assignment operators
+| "+="         { Parser.PLUSEQ }
+| "-="         { Parser.MINUSEQ }
+| "*="         { Parser.TIMESEQ }
+| "/="         { Parser.DIVEQ }
+| "%="         { Parser.REMEQ }
+
 // Operators
 | "sqrt"       { Parser.SQRT }
 | "%"          { Parser.REM }

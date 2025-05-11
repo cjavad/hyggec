@@ -58,6 +58,16 @@ let rec substVar (node: Node<'E,'T>) (var: string) (var2: string): Node<'E,'T> =
         {node with Expr = Div((substVar lhs var var2), (substVar rhs var var2))}
     | Rem(lhs, rhs) ->
         {node with Expr = Rem((substVar lhs var var2), (substVar rhs var var2))}
+    | AddAssign(lhs, rhs) ->
+        {node with Expr = AddAssign((substVar lhs var var2), (substVar rhs var var2))}
+    | SubAssign(lhs, rhs) ->
+        {node with Expr = SubAssign((substVar lhs var var2), (substVar rhs var var2))}
+    | MultAssign(lhs, rhs) ->
+        {node with Expr = MultAssign((substVar lhs var var2), (substVar rhs var var2))}
+    | DivAssign(lhs, rhs) ->
+        {node with Expr = DivAssign((substVar lhs var var2), (substVar rhs var var2))}
+    | RemAssign(lhs, rhs) ->
+        {node with Expr = RemAssign((substVar lhs var var2), (substVar rhs var var2))}
     | And(lhs, rhs) ->
         {node with Expr = And((substVar lhs var var2), (substVar rhs var var2))}
     | ScAnd(lhs, rhs) ->
@@ -394,22 +404,36 @@ let rec internal toANFDefs (node: Node<'E,'T>): Node<'E,'T> * ANFDefs<'E,'T> =
 
         ({node with Expr = scopeANF.Expr}, scopeDefs @ letDef :: initDefs)
 
-    | Assign(target, asgnExpr) ->
+    | Assign(target, asgnExpr)
+    | AddAssign(target, asgnExpr)
+    | SubAssign(target, asgnExpr)
+    | MultAssign(target, asgnExpr)
+    | DivAssign(target, asgnExpr)
+    | RemAssign(target, asgnExpr) ->
+        let asgnExpr = 
+            match node.Expr with
+            | AddAssign(_, _) -> {asgnExpr with Expr = Add(target, asgnExpr)}
+            | SubAssign(_, _) -> {asgnExpr with Expr = Sub(target, asgnExpr)}
+            | MultAssign(_, _) -> {asgnExpr with Expr = Mult(target, asgnExpr)}
+            | DivAssign(_, _) -> {asgnExpr with Expr = Div(target, asgnExpr)}
+            | RemAssign(_, _) -> {asgnExpr with Expr = Rem(target, asgnExpr)}
+            | _ -> asgnExpr
+
         /// Source expression of the assignment in ANF and related definitions
-        let (asgnExprANF, asgnExprDefs) = toANFDefs asgnExpr
+        let asgnExprANF, asgnExprDefs = toANFDefs asgnExpr
         match target.Expr with
-        | Var(_) ->
+        | Var _ ->
             /// Definition binding this expression in ANF to its variable
             let anfDef = ANFDef(false, {node with Expr = Assign(target, asgnExprANF)})
-            ({node with Expr = Var(anfDef.Var)}, anfDef :: asgnExprDefs)
+            {node with Expr = Var anfDef.Var}, anfDef :: asgnExprDefs
         | FieldSelect(ftarget, field) ->
             /// Target expr of the field selection in ANF and related definitions
-            let (ftargetExprANF, ftargetExprDefs) = toANFDefs ftarget
+            let ftargetExprANF, ftargetExprDefs = toANFDefs ftarget
             /// Assignment to field selection in ANF form
             let anfAssign = Assign({target with Expr = FieldSelect(ftargetExprANF, field)}, asgnExprANF)
             /// Definition binding this expression in ANF to its variable
             let anfDef = ANFDef(false, {node with Expr = anfAssign})
-            ({node with Expr = Var(anfDef.Var)}, anfDef :: (ftargetExprDefs @ asgnExprDefs))
+            {node with Expr = Var anfDef.Var}, anfDef :: (ftargetExprDefs @ asgnExprDefs)
         | _ ->
             failwith $"BUG: invalid assignment target: %O{target}"
 

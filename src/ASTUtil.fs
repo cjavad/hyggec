@@ -74,6 +74,17 @@ let rec subst (node: Node<'E,'T>) (var: string) (sub: Node<'E,'T>): Node<'E,'T> 
     | GreaterEq(lhs, rhs) ->
         {node with Expr = GreaterEq((subst lhs var sub), (subst rhs var sub))}
 
+    | SubAssign(lhs, rhs) ->
+        {node with Expr = SubAssign((subst lhs var sub), (subst rhs var sub))}
+    | AddAssign(lhs, rhs) ->
+        {node with Expr = AddAssign((subst lhs var sub), (subst rhs var sub))}
+    | DivAssign(lhs, rhs) ->
+        {node with Expr = DivAssign((subst lhs var sub), (subst rhs var sub))}
+    | MultAssign(lhs, rhs) ->
+        {node with Expr = MultAssign((subst lhs var sub), (subst rhs var sub))}
+    | RemAssign(lhs, rhs) ->
+        {node with Expr = RemAssign((subst lhs var sub), (subst rhs var sub))}
+
     | ReadInt
     | ReadFloat -> node // The substitution has no effect
 
@@ -212,7 +223,12 @@ let rec freeVars (node: Node<'E,'T>): Set<string> =
     | ScAnd(lhs, rhs)
     | Xor(lhs, rhs)
     | ScOr(lhs, rhs)
-    | Or(lhs, rhs) ->
+    | Or(lhs, rhs) 
+    | AddAssign(lhs, rhs)
+    | SubAssign(lhs, rhs)
+    | DivAssign(lhs, rhs)
+    | MultAssign(lhs, rhs) 
+    | RemAssign(lhs, rhs) ->
         Set.union (freeVars lhs) (freeVars rhs)
     | BNot(arg)
     | Sqrt(arg) -> freeVars arg
@@ -310,7 +326,12 @@ let rec capturedVars (node: Node<'E,'T>): Set<string> =
     | BSR(lhs, rhs)
     | Sub(lhs, rhs)
     | Add(lhs, rhs)
-    | Mult(lhs, rhs) ->
+    | Mult(lhs, rhs)
+    | AddAssign(lhs, rhs)
+    | SubAssign(lhs, rhs) 
+    | MultAssign(lhs, rhs)
+    | DivAssign(lhs, rhs)
+    | RemAssign(lhs, rhs) ->
         Set.union (capturedVars lhs) (capturedVars rhs)
     | Div(lhs, rhs) ->
         Set.union (capturedVars lhs) (capturedVars rhs)
