@@ -122,6 +122,7 @@ rule tokenize = parse
 | "array"      { Parser.ARRAY }
 | "arrayLength" { Parser.ARRAYLENGTH }
 | "arrayElem"  { Parser.ARRAYELEM }
+| "copy"       { Parser.COPY }
 
 // Generic identifier
 | ident        { Parser.IDENT(LexBuffer<_>.LexemeString lexbuf) }

@@ -1,0 +1,8 @@
+let s1: struct {f: int; g: bool} = struct {f = 0; g = true};
+
+let c1: struct {f: int; g: bool} = copy(s1);
+
+s1.f <- 2;
+
+assert(c1.f = 0);
+assert(s1.f = 2)

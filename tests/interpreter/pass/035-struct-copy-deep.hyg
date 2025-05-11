@@ -1,0 +1,16 @@
+let s1: foo = struct {f = 0; g = true};
+let s2: bar = struct {f = 0; g = s1};
+
+let c2: foo = copy(s2);
+
+s2.f <- 2;
+s2.g.f <- 4;
+
+c2.f <- 5;
+c2.g.f <- 7;
+
+assert(s2.f = 2);
+assert(s2.g.f = 4);
+
+assert(c2.f = 5);
+assert(c2.g.f = 7)

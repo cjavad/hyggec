@@ -220,6 +220,9 @@ and Expr<'E, 'T> =
     /// Assertion: fail at runtime if the argument does not evaluate to true.
     | Assertion of arg: Node<'E, 'T>
 
+    /// Copy: deep copy struct
+    | Copy of arg: Node<'E,'T>
+
     /// Let-binder, used to introduce a variable with the given 'name' in a
     /// 'scope'.  The variable is initialised with the result of the expression
     /// in 'init'.
