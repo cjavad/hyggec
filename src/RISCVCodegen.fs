@@ -69,11 +69,12 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
             System.Array.Reverse(bytes) // RISC-V is little-endian
 
         let word: int32 = System.BitConverter.ToInt32(bytes)
-
-        Asm(
-            [ (RV.LI(Reg.r (env.Target), word), $"Float value %f{v}")
-              (RV.FMV_W_X(FPReg.r (env.FPTarget), Reg.r (env.Target)), "") ]
-        )
+        
+        // FIX: Don't overwrite current env.Target, typically only env.FPTarget has been allocated
+        // for us.
+        let r = env.Target + 1u
+        (doCodegen {env with Target = r} {node with Expr = IntVal(word) })
+        ++ Asm(RV.FMV_W_X(FPReg.r (env.FPTarget), Reg.r (r)), "") 
 
     | StringVal(v) ->
         // Label marking the string constant in the data segment
@@ -911,6 +912,7 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
         /// saved registers excludes the target register for this application.
         /// Note: the definition of 'saveRegs' uses list comprehension:
         /// https://en.wikibooks.org/wiki/F_Sharp_Programming/Lists#Using_List_Comprehensions
+        /// 
         let saveRegs =
             List.except
                 [ Reg.r (env.Target) ]
@@ -920,62 +922,94 @@ let rec internal doCodegen (env: CodegenEnv) (node: TypedAST) : Asm =
                  @ [ for i in 0u .. 6u do
                          yield Reg.t (i) ])
 
+        let saveFPRegs =
+            List.except
+                [ FPReg.r (env.FPTarget) ]
+                ([ for i in 0u .. 7u do
+                      yield FPReg.fa (i) ]
+                 @ [ for i in 0u .. 11u do
+                         yield FPReg.ft (i) ])
+        
         /// Assembly code for the expression being applied as a function
         let appTermCode =
             Asm().AddText(RV.COMMENT("Load expression to be applied as a function"))
             ++ (doCodegen env expr)
+            
+        let isRetFloat = isSubtypeOf node.Env Set.empty node.Type TFloat
 
         /// Indexed list of argument expressions.  We will use the as an offset
         /// (above the current target register) to determine the target register
         /// for compiling each expression.
-        let indexedArgs = List.indexed args
+        ///
+        
+        let (floatArgs, intArgs) =
+            List.partition (fun (arg: TypedAST) -> isSubtypeOf arg.Env Set.empty arg.Type TFloat) args
+        
+        let indexedArgs = List.indexed intArgs
+        let indexedFloatArgs = List.indexed floatArgs
 
         /// Function that compiles an argument (using its index to determine its
         /// target register) and accumulates the generated assembly code
-        let compileArg (acc: Asm) (i, arg) =
+        let compileArg (isFloat) (acc: Asm) (i, arg)  =
             acc
             ++ (doCodegen
-                    { env with
-                        Target = env.Target + (uint i) + 1u }
+                    (match isFloat with
+                    | true -> { env with FPTarget = env.FPTarget + (uint i) + 1u }
+                    | false ->
+                        { env with
+                            Target = env.Target + (uint i) + 1u }) 
                     arg)
 
         /// Assembly code of all application arguments, obtained by folding over
         /// 'indexedArgs'
-        let argsCode = List.fold compileArg (Asm()) indexedArgs
+        let argsCode = List.fold (compileArg false) (Asm()) indexedArgs
+                       ++ List.fold (compileArg true) (Asm()) indexedFloatArgs
 
         /// Function that copies the content of a target register (used by
         /// 'compileArgs' and 'argsCode' above) into an 'a' register, using an
         /// index to determine the source and target registers, and accumulating
         /// the generated assembly code
-        let copyArg (acc: Asm) (i: int) =
-            acc.AddText(
-                RV.MV(Reg.a (uint i), Reg.r (env.Target + (uint i) + 1u)),
-                $"Load function call argument %d{i + 1}"
-            )
+        let copyArg (isFloat) (acc: Asm) (i: int) =
+            match isFloat with
+            | true ->
+                acc.AddText(
+                    RV.FMV_S(FPReg.fa (uint i), FPReg.r (env.FPTarget + (uint i) + 1u)),
+                    $"Load function call argument %d{i + 1}"
+                )
+            | false ->
+                acc.AddText(
+                    RV.MV(Reg.a (uint i), Reg.r (env.Target + (uint i) + 1u)),
+                    $"Load function call argument %d{i + 1}"
+                )
 
         /// Code that loads each application argument into a register 'a', by
         /// copying the contents of the target registers used by 'compileArgs'
         /// and 'argsCode' above.  To this end, this code folds over the indexes
         /// of all arguments (from 0 to args.Length), using 'copyArg' above.
-        let argsLoadCode = List.fold copyArg (Asm()) [ 0 .. (args.Length - 1) ]
+        let argsLoadCode = (List.fold (copyArg false) (Asm()) [ 0 .. (intArgs.Length - 1) ])
+                           ++ (List.fold (copyArg true) (Asm()) [ 0 .. (floatArgs.Length - 1) ])
 
         /// Code that performs the function call
         let callCode =
             appTermCode
             ++ argsCode // Code to compute each argument of the function call
                 .AddText(RV.COMMENT("Before function call: save caller-saved registers"))
-            ++ (saveRegisters saveRegs [])
+            ++ (saveRegisters saveRegs saveFPRegs)
             ++ argsLoadCode // Code to load arg values into arg registers
                 .AddText(RV.JALR(Reg.ra, Imm12(0), Reg.r (env.Target)), "Function call")
 
         /// Code that handles the function return value (if any)
         let retCode =
-            Asm(RV.MV(Reg.r (env.Target), Reg.a0), $"Copy function return value to target register")
+            match isRetFloat with
+            | true ->
+                Asm(RV.FMV_S(FPReg.r (env.FPTarget), FPReg.fa0), $"Copy function return value to target register")
+            | false ->
+                Asm(RV.MV(Reg.r (env.Target), Reg.a0), $"Copy function return value to target register")
 
-        // Put everything together, and restore the caller-saved registers
+        // Put everything together and restore the caller-saved registers
         callCode.AddText(RV.COMMENT("After function call"))
         ++ retCode.AddText(RV.COMMENT("Restore caller-saved registers"))
-        ++ (restoreRegisters saveRegs [])
+        ++ (restoreRegisters saveRegs saveFPRegs)
 
     | StructCons(fields) ->
         // To compile a structure constructor, we allocate heap space for the
@@ -1217,17 +1251,27 @@ and internal restoreRegisters (rs: List<Reg>) (fprs: List<FPReg>) : Asm =
 and internal compileFunction (args: List<string * Type>) (body: TypedAST) (env: CodegenEnv) : Asm =
     /// List of indexed arguments: we use the index as the number of the 'a'
     /// register that holds the argument
-    let indexedArgs = List.indexed args
+    
+    let (floatArgs, intArgs) =
+        List.partition (fun (_, t) -> isSubtypeOf body.Env Set.empty t TFloat) args
+        
+    let indexedArgs = List.indexed intArgs
+    let indexedFloatArgs = List.indexed floatArgs
 
     /// Folder function that assigns storage information to function arguments:
     /// it assigns an 'a' register to each function argument, and accumulates
     /// the result in a mapping (that will be used as env.VarStorage)
-    let folder (acc: Map<string, Storage>) (i, (var, _tpe)) =
-        acc.Add(var, Storage.Reg(Reg.a ((uint) i)))
+    let folder (isFloat) (acc: Map<string, Storage>) (i, (var, _tpe)) =
+        match isFloat with
+        | true ->
+            acc.Add(var, Storage.FPReg(FPReg.fa ((uint) i)))
+        | false ->
+            acc.Add(var, Storage.Reg(Reg.a ((uint) i)))
 
     /// Updated storage information including function arguments
-    let varStorage2 = List.fold folder env.VarStorage indexedArgs
-
+    let varStorage2 = List.fold (folder false) env.VarStorage indexedArgs
+    let varStorage2 = List.fold (folder true) varStorage2 indexedFloatArgs
+    
     /// Code for the body of the function, using the newly-created
     /// variable storage mapping 'varStorage2'.  NOTE: the function body
     /// compilation restarts the target register numbers from 0.  Consequently,
@@ -1242,10 +1286,16 @@ and internal compileFunction (args: List<string * Type>) (body: TypedAST) (env: 
               VarStorage = varStorage2 }
 
         doCodegen env body
+        
+    let isRetFloat = isSubtypeOf body.Env Set.empty body.Type TFloat
 
     /// Code to move the body result into the function return value register
     let returnCode =
-        Asm(RV.MV(Reg.a0, Reg.r (0u)), "Move result of function into return value register")
+        match isRetFloat with
+        | true ->
+            Asm(RV.FMV_S(FPReg.fa0, FPReg.r (0u)), "Move result of function into return value register")
+        | false ->
+            Asm(RV.MV(Reg.a0, Reg.r (0u)), "Move result of function into return value register")
 
     /// Integer registers to save before executing the function body.
     /// Note: the definition of 'saveRegs' uses list comprehension:
@@ -1253,16 +1303,20 @@ and internal compileFunction (args: List<string * Type>) (body: TypedAST) (env: 
     let saveRegs =
         [ for i in 0u .. 11u do
               yield Reg.s (i) ]
+        
+    let saveFPRegs =
+        [ for i in 0u .. 11u do
+              yield FPReg.fs (i) ]
 
     // Finally, we put together the full code for the function
     Asm(RV.COMMENT("Funtion prologue begins here"))
         .AddText(RV.COMMENT("Save callee-saved registers"))
-    ++ (saveRegisters saveRegs [])
+    ++ (saveRegisters saveRegs saveFPRegs)
         .AddText(RV.ADDI(Reg.fp, Reg.sp, Imm12(saveRegs.Length * 4)), "Update frame pointer for the current function")
         .AddText(RV.COMMENT("End of function prologue.  Function body begins"))
     ++ bodyCode.AddText(RV.COMMENT("End of function body.  Function epilogue begins"))
     ++ returnCode.AddText(RV.COMMENT("Restore callee-saved registers"))
-    ++ (restoreRegisters saveRegs [])
+    ++ (restoreRegisters saveRegs saveFPRegs)
         .AddText(RV.JR(Reg.ra), "End of function, return to caller")
 
 and internal deepCopy (env: CodegenEnv) (arg: Node<TypingEnv, Type>): Asm = 
