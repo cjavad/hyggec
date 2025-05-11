@@ -932,6 +932,7 @@ and internal deepCopy (renv': RuntimeEnv<'E, 'T>) (node': Node<'E, 'T>): Option<
         | BoolVal(_)
         | IntVal(_)
         | FloatVal(_)
+        | UnionCons(_)
         | StringVal(_) -> Some(renv, node)
         | StructCons(fields) -> 
             let (muta, fieldNames, fieldNodes) = List.unzip3 fields
@@ -948,7 +949,7 @@ and internal deepCopy (renv': RuntimeEnv<'E, 'T>) (node': Node<'E, 'T>): Option<
             | None -> None                
             | Some(info) ->
                 match info with                
-                | Arraylen(_) -> failwith "Not Implemented"
+                | Arraylen(_) -> Some(renv, node)
                 | StructFields(fieldNames) ->            
                     let folder ((offset, field): int * String) ((env, nodes): RuntimeEnv<'E, 'T> * List<Node<'E, 'T>>) : RuntimeEnv<'E, 'T> * List<Node<'E, 'T>> = 
                         let node = env.Heap[baseAddr + (uint offset)]
@@ -967,8 +968,6 @@ and internal deepCopy (renv': RuntimeEnv<'E, 'T>) (node': Node<'E, 'T>): Option<
                             PtrInfo = ptrInfo' },
                         { node with Expr = Pointer(baseAddr') }
                     )
-                
-            
         | _ -> failwith "not implemented"
 
     dCopy renv' node'
